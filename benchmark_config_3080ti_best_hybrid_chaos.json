@@ -1,0 +1,17 @@
+{
+    "benchmark_scenes": [
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/30_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_8_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_refit_chaos.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_rebuild_chaos.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb1_chaos.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb2_chaos.json"
+    ]
+}

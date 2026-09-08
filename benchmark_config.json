@@ -1,0 +1,17 @@
+{
+    "skip_validation": true,
+    "skip_plot": true,
+
+    "benchmark_scenes": [
+        "configs/scenes/Lumberyard_all.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/1_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_1_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/static_visual.json"
+    ]
+}

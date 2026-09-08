@@ -1,0 +1,21 @@
+# CMake build tree
+build/
+mesh/*
+!mesh/.gitkeep
+benchmark/*
+!benchmark/plot_results.py
+
+# Old per-subdirectory build artifacts (pre-CMake)
+cpp/grca_cpu
+cpp/compare_csv
+cuda/grca_cuda
+optix_cuda/optix
+optix_cuda/optix_device.ptx
+
+# CSV outputs
+*.csv
+
+# Object files / generated PTX
+*.o
+*.ptx
+

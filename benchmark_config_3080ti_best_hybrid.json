@@ -1,0 +1,47 @@
+{
+    "benchmark_scenes": [
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/30_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_8_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_refit.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_rebuild.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb1.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb2.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb3.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb4.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb5.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb6.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb7.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb8.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb9.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb10.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb11.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb12.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb13.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb14.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb15.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_refit_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_rebuild_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb1_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb2_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb3_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb4_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb5_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb6_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb7_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb8_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb9_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb10_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb11_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb12_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb13_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb14_chaos_bound.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb15_chaos_bound.json"
+    ]
+}

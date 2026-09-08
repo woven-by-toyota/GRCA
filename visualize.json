@@ -1,0 +1,19 @@
+{
+    "visualizer_on": true,
+    "mesh_vis_on": 2,
+    "benchmark_scenes": [
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/1_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_1_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/static_visual.json"
+    ],
+
+    "w_cam_position": [-183.409, 28.426, -11.295],
+    "w_cam_forward": [0.864, 0.045, 0.502]
+}

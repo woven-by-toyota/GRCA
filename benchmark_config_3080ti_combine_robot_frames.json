@@ -1,0 +1,26 @@
+{
+    "benchmark_scenes": [
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/30_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_1_robot.json",
+        "configs/robots/max_rays_2_robot.json",
+        "configs/robots/max_rays_3_robot.json",
+        "configs/robots/max_rays_4_robot.json",
+        "configs/robots/max_rays_5_robot.json",
+        "configs/robots/max_rays_6_robot.json",
+        "configs/robots/max_rays_7_robot.json",
+        "configs/robots/max_rays_8_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/3080ti mobile/rebuild_distributed_robot_frames.json",
+        "configs/tests/3080ti mobile/rebuild_combined_robot_frames.json",
+        "configs/tests/3080ti mobile/rebuild_chaos_bound_distributed_robot_frames.json",
+        "configs/tests/3080ti mobile/rebuild_chaos_bound_combined_robot_frames.json",
+        "configs/tests/3080ti mobile/rebuild_chaos_distributed_robot_frames.json",
+        "configs/tests/3080ti mobile/rebuild_chaos_combined_robot_frames.json"
+    ]
+}

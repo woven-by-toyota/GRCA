@@ -1,0 +1,18 @@
+{
+    "static_meshes": [
+        {
+            "file": "mesh/vokselia_spawn/vokselia_spawn.obj",
+            "scale": 100,
+            "w_position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "color": [
+                0.7,
+                0.7,
+                0.7
+            ]
+        }
+    ]
+}

@@ -1,0 +1,21 @@
+{
+    "skip_validation": false,
+    "benchmark_scenes": [
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/1_dyn_mesh.json",
+        "configs/dynamic_meshes/1_1_sub_div_dyn_mesh.json",
+        "configs/dynamic_meshes/1_2_sub_div_dyn_mesh.json",
+        "configs/dynamic_meshes/1_3_sub_div_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_2_robot.json",
+        "configs/robots/max_rays_4_robot.json",
+        "configs/robots/max_rays_6_robot.json",
+        "configs/robots/max_rays_8_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/main_suite/rebuild_sub_div.json"
+    ]
+}

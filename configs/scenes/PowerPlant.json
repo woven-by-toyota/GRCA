@@ -1,0 +1,19 @@
+{
+    "static_meshes": [
+        {
+            "file": "mesh/powerplant/powerplant.obj",
+            "scale": 0.001,
+            "w_position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "color": [
+                0.5,
+                0.5,
+                0.5
+            ],
+            "color_override": true
+        }
+    ]
+}

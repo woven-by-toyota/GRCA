@@ -1,0 +1,18 @@
+{
+    "skip_validation": false,
+    "skip_plot": false,
+    "benchmark_scenes": [
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/30_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_8_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/3080ti mobile/rebuild_hybrid.json",
+        "configs/tests/3080ti mobile/rebuild_bound_chaos_hybrid.json",
+        "configs/tests/3080ti mobile/rebuild_chaos_hybrid.json"
+    ]
+}

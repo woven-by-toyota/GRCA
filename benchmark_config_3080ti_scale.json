@@ -1,0 +1,21 @@
+{
+    "skip_validation": false,
+    "benchmark_scenes": [
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/10_dyn_mesh.json",
+        "configs/dynamic_meshes/20_dyn_mesh.json",
+        "configs/dynamic_meshes/30_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_2_robot.json",
+        "configs/robots/max_rays_4_robot.json",
+        "configs/robots/max_rays_6_robot.json",
+        "configs/robots/max_rays_8_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/3080ti mobile/rebuild_scale.json",
+        "configs/tests/3080ti mobile/rebuild_chaos_scale.json"
+    ]
+}

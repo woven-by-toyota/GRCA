@@ -1,0 +1,15 @@
+{
+    "skip_validation": false,
+    "benchmark_scenes": [
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/30_1_sub_div_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_8_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/3080ti mobile/rebuild_scale_large.json"
+    ]
+}

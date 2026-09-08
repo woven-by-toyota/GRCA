@@ -1,0 +1,16 @@
+{
+    "benchmark_scenes": [
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/30_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_8_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/main_suite/rebuild_compact.json",
+        "configs/tests/main_suite/rebuild_bound_chaos_compact.json",
+        "configs/tests/main_suite/rebuild_chaos_compact.json"
+    ]
+}

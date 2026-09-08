@@ -1,0 +1,61 @@
+{
+    "skip_plot": true,
+    "bat_capacity": 4500000,
+    "benchmark_scenes": [
+        "configs/scenes/VokseliaSpawn.json",
+        "configs/scenes/Lumberyard_all.json",
+        "configs/scenes/SanMiguel.json",
+        "configs/scenes/RungHolt.json",
+        "configs/scenes/EmeraldSquare.json",
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/10_dyn_mesh.json",
+        "configs/dynamic_meshes/20_dyn_mesh.json",
+        "configs/dynamic_meshes/30_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_2_robot.json",
+        "configs/robots/max_rays_4_robot.json",
+        "configs/robots/max_rays_6_robot.json",
+        "configs/robots/max_rays_8_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_8.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_8x16.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_8x32.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_8x64.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_8x96.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_8x128.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_16x8.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_16.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_16x32.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_16x64.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_16x96.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_16x128.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_32x8.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_32x16.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_32.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_32x64.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_32x96.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_32x128.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_64x8.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_64x16.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_64x32.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_64.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_64x96.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_64x128.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_96x8.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_96x16.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_96x32.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_96x64.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_96.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_96x128.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_128x8.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_128x16.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_128x32.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_128x64.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_128x96.json",
+        "configs/tests/3080ti mobile/negative_case_sat_sweep/nd_obd_swd_sat_sweep_128.json"
+    ]
+}

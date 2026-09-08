@@ -1,0 +1,20 @@
+{
+    "skip_validation": false,
+    "benchmark_scenes": [
+        "configs/scenes/VokseliaSpawn.json",
+        "configs/scenes/Lumberyard_all.json",
+        "configs/scenes/SanMiguel.json",
+        "configs/scenes/RungHolt.json",
+        "configs/scenes/EmeraldSquare.json",
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_2_robot.json",
+        "configs/robots/max_rays_4_robot.json",
+        "configs/robots/max_rays_6_robot.json",
+        "configs/robots/max_rays_8_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/3080ti mobile/scene_size_static.json"
+    ]
+}

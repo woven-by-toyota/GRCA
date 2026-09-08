@@ -1,0 +1,30 @@
+{
+    "skip_validation": false,
+    "benchmark_scenes": [
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/30_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_8_robot_5.json",
+        "configs/robots/max_rays_8_robot_10.json",
+        "configs/robots/max_rays_8_robot_15.json",
+        "configs/robots/max_rays_8_robot_25.json",
+        "configs/robots/max_rays_8_robot_35.json",
+        "configs/robots/max_rays_8_robot_50.json",
+        "configs/robots/max_rays_8_robot_75.json",
+        "configs/robots/max_rays_8_robot_100.json",
+        "configs/robots/max_rays_8_robot_150.json",
+        "configs/robots/max_rays_8_robot_200.json",
+        "configs/robots/max_rays_8_robot_300.json",
+        "configs/robots/max_rays_8_robot_500.json",
+        "configs/robots/max_rays_8_robot_750.json",
+        "configs/robots/max_rays_8_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/3080ti mobile/rebuild_range.json",
+        "configs/tests/3080ti mobile/rebuild_chaos_bound_range.json",
+        "configs/tests/3080ti mobile/rebuild_chaos_range.json"
+    ]
+}

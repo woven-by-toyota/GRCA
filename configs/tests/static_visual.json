@@ -1,0 +1,38 @@
+{
+    "auto_hit_view_record_frame": -1,
+    "record_frames": -1,
+    "visualizer_on": true,
+    "mesh_vis_on": 2,
+    "cone_vis_on": true,
+
+    "cuda": {
+    },
+    "cpu": {
+        "packet_size": 16
+    },
+    "embree": {
+        "bvh_compaction_on": false,
+        "bvh_rebuild_after_frames": 0,
+        "packet_size": 16
+    },
+    "optix": {
+        "bvh_compaction_on": false,
+        "bvh_rebuild_after_frames": 0
+    },
+    "batches": [
+        {
+            "backend": "grca-cuda",
+            "lidar_sim_rate": 10.0,
+            "random_dynamic_test": {
+                "seed": 42,
+                "pos_interpolate_frames": -1,
+                "rot_interpolate_frames": -1,
+                "scale_interpolate_frames": -1,
+                "scale_min": 0.001,
+                "scale_max": 30,
+                "tri_chaos": false,
+                "candidates": ["dynamic_meshes", "robots"]
+            }
+        }
+    ]
+}

@@ -1,0 +1,27 @@
+{
+    "skip_validation": false,
+    "benchmark_scenes": [
+        "configs/scenes/VokseliaSpawn.json",
+        "configs/scenes/Lumberyard_all.json",
+        "configs/scenes/SanMiguel.json",
+        "configs/scenes/RungHolt.json",
+        "configs/scenes/EmeraldSquare.json",
+        "configs/scenes/PowerPlant.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/10_dyn_mesh.json",
+        "configs/dynamic_meshes/20_dyn_mesh.json",
+        "configs/dynamic_meshes/30_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_2_robot_200.json",
+        "configs/robots/max_rays_4_robot_200.json",
+        "configs/robots/max_rays_6_robot_200.json",
+        "configs/robots/max_rays_8_robot_200.json"
+    ],
+    "active_tests": [
+        "configs/tests/main_suite/rebuild_hybrid.json",
+        "configs/tests/main_suite/rebuild_bound_chaos_hybrid.json",
+        "configs/tests/main_suite/rebuild_chaos_hybrid.json"
+    ]
+}

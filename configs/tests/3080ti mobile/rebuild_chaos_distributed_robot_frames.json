@@ -1,0 +1,46 @@
+{
+    "visualizer_on": false,
+    "auto_hit_view_record_frame": -1,
+    "record_frames": 50,
+
+    "cuda": {
+    },
+    "cpu": {
+        "packet_size": 16
+    },
+    "embree": {
+        "bvh_rebuild_after_frames": 0,
+        "bvh_compaction_on": false,
+        "packet_size": 16
+    },
+    "optix": {
+        "bvh_rebuild_after_frames": 0,
+        "bvh_compaction_on": false
+    },
+    "batches": [
+        {
+            "backend": "gpu-all",
+            "lidar_sim_rate": 100.0,
+            "random_dynamic_test": {
+                "seed": 42,
+                "pos_interpolate_frames": 0,
+                "rot_interpolate_frames": 0,
+                "scale_interpolate_frames": -1,
+                "tri_chaos": true,
+                "candidates": ["dynamic_meshes", "robots"]
+            }
+        },
+        {
+            "backend": "cpu",
+            "lidar_sim_rate": 100.0,
+            "random_dynamic_test": {
+                "seed": 42,
+                "pos_interpolate_frames": 0,
+                "rot_interpolate_frames": 0,
+                "scale_interpolate_frames": -1,
+                "tri_chaos": true,
+                "candidates": ["dynamic_meshes", "robots"]
+            }
+        }
+    ]
+}

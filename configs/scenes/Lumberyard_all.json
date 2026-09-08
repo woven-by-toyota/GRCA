@@ -1,0 +1,32 @@
+{
+    "static_meshes": [
+        {
+            "file": "mesh/Amazon_Lumberyard_Bistro/Interior/interior.obj",
+            "scale": 0.02,
+            "w_position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "color": [
+                0.7,
+                0.7,
+                0.7
+            ]
+        },
+        {
+            "file": "mesh/Amazon_Lumberyard_Bistro/Exterior/exterior.obj",
+            "scale": 0.02,
+            "w_position": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "color": [
+                0.7,
+                0.7,
+                0.7
+            ]
+        }
+    ]
+}

@@ -1,0 +1,76 @@
+{
+    "visualizer_on": false,
+    "auto_hit_view_record_frame": -1,
+    "record_frames": 500,
+    "cuda": {
+        "sat_max_sweep_diff": 128,
+        "sat_max_channel_diff": 8
+    },
+    "cpu": {
+        "sat_max_sweep_diff": 128,
+        "sat_max_channel_diff": 8,
+        "packet_size": 16
+    },
+    "embree": {
+        "bvh_rebuild_after_frames": 0,
+        "bvh_compaction_on": false,
+        "packet_size": 16
+    },
+    "optix": {
+        "bvh_rebuild_after_frames": 0,
+        "bvh_compaction_on": false
+    },
+    "batches": [
+        {
+            "backend": "grca",
+            "lidar_sim_rate": 100.0,
+            "random_dynamic_test": {
+                "seed": 42,
+                "pos_interpolate_frames": 0,
+                "rot_interpolate_frames": 0,
+                "scale_interpolate_frames": 0,
+                "scale_min": 0.001,
+                "scale_max": 30,
+                "tri_chaos": false,
+                "candidates": [
+                    "dynamic_meshes",
+                    "robots"
+                ]
+            }
+        },
+        {
+            "backend": "grca",
+            "lidar_sim_rate": 100.0,
+            "random_dynamic_test": {
+                "seed": 42,
+                "pos_interpolate_frames": 0,
+                "rot_interpolate_frames": 0,
+                "scale_interpolate_frames": 0,
+                "scale_min": 0.001,
+                "scale_max": 30,
+                "tri_chaos": 2,
+                "candidates": [
+                    "dynamic_meshes",
+                    "robots"
+                ]
+            }
+        },
+        {
+            "backend": "grca",
+            "lidar_sim_rate": 100.0,
+            "random_dynamic_test": {
+                "seed": 42,
+                "pos_interpolate_frames": 0,
+                "rot_interpolate_frames": 0,
+                "scale_interpolate_frames": 0,
+                "scale_min": 0.001,
+                "scale_max": 30,
+                "tri_chaos": true,
+                "candidates": [
+                    "dynamic_meshes",
+                    "robots"
+                ]
+            }
+        }
+    ]
+}
