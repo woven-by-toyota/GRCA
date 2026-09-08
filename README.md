@@ -1,6 +1,6 @@
 # GRCA test bed
 
-Unified multi-backend LiDAR benchmark for Ubuntu 22.04 and 24.04, used for evaluating the ray-casting algorithm (GRCA) introduced in:
+Unified multi-backend LiDAR benchmark for Ubuntu 22.04 and 24.04, used for evaluating the ray-casting algorithm (GRCA) introduced in following paper:
 
 [Geometrically Approximated Modeling for Emitter-Centric
 Ray-Triangle Filtering in Arbitrarily Dynamic LiDAR Simulation](https://arxiv.org/abs/2605.10457)
