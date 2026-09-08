@@ -1022,4 +1022,3 @@ With all angles zero: forward = (0,0,1), up = (0,1,0), right = (1,0,0).
 6. Press Play:
    - `G` — run GRCA benchmark
    - `H` — show LiDAR hit points
-# GRCA
