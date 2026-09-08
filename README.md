@@ -183,6 +183,22 @@ Binaries in `build/`:
 - `compare_csv`   — CSV comparison utility
 - `csv_viewer`    — Vulkan hit-point visualizer
 
+## Mesh Assets
+
+The benchmark mesh assets are distributed separately from this repository in
+the [GRCA supplementary files on Zenodo](https://zenodo.org/records/21127672?preview=1&token=eyJhbGciOiJIUzUxMiJ9.eyJpZCI6IjI5YzJmZGE3LTBmMTgtNGE5My04Zjk2LTg4ZjZjMWNlOWU5NyIsImRhdGEiOnt9LCJyYW5kb20iOiI2ZmUwZDdmM2VmZjQ3NDY5ZjRhNGYwOTA4YzQ1YTU4YiJ9.FpqNlcQyMeOp1WrnnHrJByxI4QLbOOAKBiStKn2E-V8qkRGZTMwR9KRDHA6aZjoRqH_khanytDcUUYkHBsrDkw).
+Download `mesh.zip`, extract it, and copy the resulting `mesh/` directory into
+the project root:
+
+```bash
+unzip mesh.zip
+cp -a mesh/. /path/to/GRCA/mesh/
+```
+
+The archive includes the license and attribution notices for the redistributed
+assets. See those notices before redistributing the meshes or using them
+commercially.
+
 ---
 
 ## Configuration
