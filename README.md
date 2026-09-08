@@ -6,14 +6,14 @@ Unified multi-backend LiDAR benchmark for Ubuntu 22.04 and 24.04, used for evalu
 Ray-Triangle Filtering in Arbitrarily Dynamic LiDAR Simulation](https://arxiv.org/abs/2605.10457)
 
 Qualitative results for the paper can be found at:
+- [[I]RCA Visualization](https://anonymous.4open.science/r/-I-RCA-Visualization/README.md)
 
-[[I]RCA Visualization](https://anonymous.4open.science/r/-I-RCA-Visualization/README.md)
-
-Mesh files and video files are available in [Zenodo archive](https://zenodo.org/records/21127672?preview=1&token=eyJhbGciOiJIUzUxMiJ9.eyJpZCI6IjI5YzJmZGE3LTBmMTgtNGE5My04Zjk2LTg4ZjZjMWNlOWU5NyIsImRhdGEiOnt9LCJyYW5kb20iOiI2ZmUwZDdmM2VmZjQ3NDY5ZjRhNGYwOTA4YzQ1YTU4YiJ9.FpqNlcQyMeOp1WrnnHrJByxI4QLbOOAKBiStKn2E-V8qkRGZTMwR9KRDHA6aZjoRqH_khanytDcUUYkHBsrDkw). Download `mesh.zip`, extract it, and copy the contents into the repository's `mesh/` directory:
+The mesh files evaluated for the paper and required for this repository can be downloaded [here](https://zenodo.org/records/21127672?preview=1&token=eyJhbGciOiJIUzUxMiJ9.eyJpZCI6IjI5YzJmZGE3LTBmMTgtNGE5My04Zjk2LTg4ZjZjMWNlOWU5NyIsImRhdGEiOnt9LCJyYW5kb20iOiI2ZmUwZDdmM2VmZjQ3NDY5ZjRhNGYwOTA4YzQ1YTU4YiJ9.FpqNlcQyMeOp1WrnnHrJByxI4QLbOOAKBiStKn2E-V8qkRGZTMwR9KRDHA6aZjoRqH_khanytDcUUYkHBsrDkw). To install them, download `mesh.zip`, then run the following from the GRCA project root:
 
 ```bash
-unzip mesh.zip
-cp -a mesh/. /path/to/GRCA/mesh/
+cd /path/to/GRCA
+unzip /path/to/mesh.zip
+cp -a mesh/. ./mesh/
 ```
 
 All eight backends — **GRCA-CPU**, **GRCA-CUDA**, **OptiX**, **Embree**, **TinyBVH-CPU**, **TinyBVH-GPU**, **Hybrid-CPU**, and **Hybrid-GPU** — are built from a single CMake project and driven by a single `benchmark_config.json` file.
