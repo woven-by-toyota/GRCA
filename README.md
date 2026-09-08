@@ -5,6 +5,17 @@ Unified multi-backend LiDAR benchmark for Ubuntu 22.04 and 24.04, used for evalu
 [Geometrically Approximated Modeling for Emitter-Centric
 Ray-Triangle Filtering in Arbitrarily Dynamic LiDAR Simulation](https://arxiv.org/abs/2605.10457)
 
+Qualitative results for the paper can be found at:
+
+[[I]RCA Visualization](https://anonymous.4open.science/r/-I-RCA-Visualization/README.md)
+
+Mesh files and video files are available in the [Zenodo supplementary files](https://zenodo.org/records/21127672?preview=1&token=eyJhbGciOiJIUzUxMiJ9.eyJpZCI6IjI5YzJmZGE3LTBmMTgtNGE5My04Zjk2LTg4ZjZjMWNlOWU5NyIsImRhdGEiOnt9LCJyYW5kb20iOiI2ZmUwZDdmM2VmZjQ3NDY5ZjRhNGYwOTA4YzQ1YTU4YiJ9.FpqNlcQyMeOp1WrnnHrJByxI4QLbOOAKBiStKn2E-V8qkRGZTMwR9KRDHA6aZjoRqH_khanytDcUUYkHBsrDkw). Download `mesh.zip`, extract it, and copy the contents into the repository's `mesh/` directory:
+
+```bash
+unzip mesh.zip
+cp -a mesh/. /path/to/GRCA/mesh/
+```
+
 All eight backends — **GRCA-CPU**, **GRCA-CUDA**, **OptiX**, **Embree**, **TinyBVH-CPU**, **TinyBVH-GPU**, **Hybrid-CPU**, and **Hybrid-GPU** — are built from a single CMake project and driven by a single `benchmark_config.json` file.
 
 ---
@@ -182,24 +193,6 @@ Binaries in `build/`:
 - `grca`           — main benchmark
 - `compare_csv`   — CSV comparison utility
 - `csv_viewer`    — Vulkan hit-point visualizer
-
-## Mesh Assets
-
-The benchmark mesh assets are distributed separately from this repository in
-the [GRCA supplementary files on Zenodo](https://zenodo.org/records/21127672?preview=1&token=eyJhbGciOiJIUzUxMiJ9.eyJpZCI6IjI5YzJmZGE3LTBmMTgtNGE5My04Zjk2LTg4ZjZjMWNlOWU5NyIsImRhdGEiOnt9LCJyYW5kb20iOiI2ZmUwZDdmM2VmZjQ3NDY5ZjRhNGYwOTA4YzQ1YTU4YiJ9.FpqNlcQyMeOp1WrnnHrJByxI4QLbOOAKBiStKn2E-V8qkRGZTMwR9KRDHA6aZjoRqH_khanytDcUUYkHBsrDkw).
-Download `mesh.zip`, extract it, and copy the resulting `mesh/` directory into
-the project root:
-
-```bash
-unzip mesh.zip
-cp -a mesh/. /path/to/GRCA/mesh/
-```
-
-The archive includes the license and attribution notices for the redistributed
-assets. See those notices before redistributing the meshes or using them
-commercially.
-
----
 
 ## Configuration
 
