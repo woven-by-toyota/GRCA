@@ -277,25 +277,25 @@ static std::string backendLabel(const RunConfig& cfg) {
     if (cfg.backend == "grca-cpu")  return "GRCA_cpu_vec" + std::to_string(cfg.grca_cpu_packet_size);
     if (cfg.backend == "optix" || cfg.backend == "optix-crti") {
         int n = cfg.optix_rebuild_after_frames;
-        std::string mode = (n > 0) ? "hb" + std::to_string(n) : (n == 0 ? "rb" : "rf");
+        std::string mode = (n > 0) ? "pr" + std::to_string(n) : (n == 0 ? "rb" : "rf");
         std::string comp = cfg.optix_compaction ? "cmp_" : "";
         std::string is   = (cfg.backend == "optix-crti") ? "crti_" : "";
         return "Optix_" + is + comp + mode;
     }
     if (cfg.backend == "embree") {
         int n = cfg.embree_rebuild_after_frames;
-        std::string mode = (n > 0) ? "hb" + std::to_string(n) : (n == 0 ? "rb" : "rf");
+        std::string mode = (n > 0) ? "pr" + std::to_string(n) : (n == 0 ? "rb" : "rf");
         std::string comp = cfg.embree_compaction ? "cmp_" : "";
         return "Embree_vec" + std::to_string(cfg.embree_packet_size) + "_" + comp + mode;
     }
     if (cfg.backend == "tinybvh-cpu") {
         int n = cfg.tinybvh_cpu_rebuild_after_frames;
-        std::string mode = (n > 0) ? "hb" + std::to_string(n) : (n == 0 ? "rb" : "rf");
+        std::string mode = (n > 0) ? "pr" + std::to_string(n) : (n == 0 ? "rb" : "rf");
         return "TinyBVH_cpu_" + mode;
     }
     if (cfg.backend == "tinybvh-gpu") {
         int n = cfg.tinybvh_gpu_rebuild_after_frames;
-        std::string mode = (n > 0) ? "hb" + std::to_string(n) : (n == 0 ? "rb" : "rf");
+        std::string mode = (n > 0) ? "pr" + std::to_string(n) : (n == 0 ? "rb" : "rf");
         return "TinyBVH_gpu_" + mode;
     }
     if (cfg.backend == "hybrid-cpu") {

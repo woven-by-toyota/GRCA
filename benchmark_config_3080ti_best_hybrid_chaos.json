@@ -11,7 +11,7 @@
     "active_tests": [
         "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_refit_chaos.json",
         "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_rebuild_chaos.json",
-        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb1_chaos.json",
-        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_hb2_chaos.json"
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_pr1_chaos.json",
+        "configs/tests/3080ti mobile/fast_hybrid_find/bvh_sweep_pr2_chaos.json"
     ]
 }
