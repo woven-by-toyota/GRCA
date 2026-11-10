@@ -31,7 +31,8 @@ All eight backends — **GRCA-CPU**, **GRCA-CUDA**, **OptiX**, **Embree**, **Tin
    - [Python (for plots)](#python-for-plots)
 2. [Build](#build)
 3. [Configuration](#configuration)
-    - [Main-suite rebuild sweep](#main-suite-rebuild-sweep)
+   - [Benchmark presets](#benchmark-presets)
+   - [Main-suite rebuild sweep](#main-suite-rebuild-sweep)
    - [Active tests](#active-tests)
    - [Test file fields](#test-file-fields)
    - [Hybrid Test Example](#hybrid-test-example)
@@ -213,63 +214,39 @@ configs/tests/<subfolder>/<name>.json        → subfolders are supported (e.g. 
 
 The benchmark runs one session per **(scene × dynamic_mesh_count × robot_count)** combination, in that loop order.
 
-**Current repository default `benchmark_config.json`**
-```json
-{
-    "skip_validation": true,
-    "skip_plot": true,
-    "benchmark_scenes": [
-        "configs/scenes/Lumberyard_all.json"
-    ],
-    "benchmark_dynamic_meshes": [
-        "configs/dynamic_meshes/1_dyn_mesh.json"
-    ],
-    "benchmark_robots": [
-        "configs/robots/max_rays_1_robot.json"
-    ],
-    "active_tests": [
-        "configs/tests/static_visual.json"
-    ]
-}
-```
-
-**Main-suite benchmark example**
-```json
-{
-    "skip_validation": false,
-    "benchmark_scenes": [
-        "configs/scenes/VokseliaSpawn.json",
-        "configs/scenes/Lumberyard_all.json",
-        "configs/scenes/SanMiguel.json",
-        "configs/scenes/RungHolt.json",
-        "configs/scenes/EmeraldSquare.json",
-        "configs/scenes/PowerPlant.json"
-    ],
-    "benchmark_dynamic_meshes": [
-        "configs/dynamic_meshes/10_dyn_mesh.json",
-        "configs/dynamic_meshes/20_dyn_mesh.json",
-        "configs/dynamic_meshes/30_dyn_mesh.json"
-    ],
-    "benchmark_robots": [
-        "configs/robots/max_rays_2_robot.json",
-        "configs/robots/max_rays_4_robot.json",
-        "configs/robots/max_rays_6_robot.json",
-        "configs/robots/max_rays_8_robot.json"
-    ],
-    "active_tests": [
-        "configs/tests/main_suite/rebuild.json",
-        "configs/tests/main_suite/rebuild_bound_chaos.json",
-        "configs/tests/main_suite/rebuild_chaos.json"
-    ]
-}
-```
-
-For the full 6-run rebuild sweep, add:
-- `configs/tests/main_suite/rebuild_compact.json`
-- `configs/tests/main_suite/rebuild_bound_chaos_compact.json`
-- `configs/tests/main_suite/rebuild_chaos_compact.json`
-
 If `benchmark_dynamic_meshes` is omitted, the scene's own `dynamic_meshes` array is used as-is.
+
+The checked-in `benchmark_config.json` is a quick live-preview setup (Lumberyard Bistro, 1 dynamic mesh, 1 robot, `static_visual.json`). To reproduce a paper benchmark, use one of the [benchmark presets](#benchmark-presets).
+
+### Benchmark presets
+
+`presets/` holds the top-level configs used for the paper's benchmarks, all run on PC1 (i7-12700H + RTX 3080 Ti Mobile). Paths inside a config resolve relative to the config file's own directory, so a preset cannot be run in place from `presets/`; copy its contents into `benchmark_config.json` at the project root first:
+
+```bash
+cp presets/benchmark_config_3080ti_main_suite.json benchmark_config.json
+./build/grca
+```
+
+| Preset | Paper experiment |
+|--------|------------------|
+| `benchmark_config_3080ti_main_suite.json` | Results: full main suite, `range_max` = 1000 m |
+| `benchmark_config_3080ti_main_suite_100.json` | Results: range-culled main suite, `range_max` = 100 m |
+| `benchmark_config_3080ti_main_suite_hybrid.json` | Results: hybrid pipeline main suite, `range_max` = 1000 m |
+| `benchmark_config_3080ti_main_suite_hybrid_100.json` | Results: Range+Hybrid main suite, `range_max` = 100 m |
+| `benchmark_config_3080ti_hybrid_backend.json` | Hybrid Static/Dynamic Pipeline: hybrid vs. standalone backends (Power Plant, 30 dyn, Ω = 8) |
+| `benchmark_config_3080ti_best_hybrid.json` | BVH Mode Selection: `rf` / `rb` / `pr1`–`pr15` under ND and OBD |
+| `benchmark_config_3080ti_best_hybrid_chaos.json` | BVH Mode Selection: `rf` / `rb` / `pr1` / `pr2` under SWD |
+| `benchmark_config_3080ti_extreme_pose.json` | Pose sensitivity: the eight motion configurations (Suppl., Preliminary Study) |
+| `benchmark_config_3080ti_sub_div_test.json` | Mesh density (fixed scale): sports car subdivided up to 64× |
+| `benchmark_config_3080ti_scale.json` | Mesh scale (fixed density): 8 scale ranges |
+| `benchmark_config_3080ti_large_scale_sub_div.json` | Joint scale × density: 1× subdivided sports car at large scale ranges |
+| `benchmark_config_3080ti_range.json` | Range Variation: `range_max` from 5 m to 1000 m |
+| `benchmark_config_3080ti_static.json` | Scene Size Robustness: static-only scenes (Suppl.) |
+| `benchmark_config_3080ti_combine_robot_frames.json` | Ray Origin Co-location: distributed vs. co-located origins, Ω = 1–8 (Suppl.) |
+| `benchmark_config_3080ti_best_sat_chaos.json` | Span Threshold Selection: (γ<sub>T</sub>, χ<sub>T</sub>) over 8 scale ranges, SWD (Suppl.; the paper reports the 32–128 subset for Vokselia Spawn + 10 dyn and Power Plant + 30 dyn) |
+| `benchmark_config_negative_case_sat_sweep.json` | Extended span-threshold sweep: all 36 (γ<sub>T</sub>, χ<sub>T</sub>) combinations on the main suite, ND/OBD/SWD (Suppl.) |
+
+`benchmark_config_3080ti_compact_cost.json` (main-suite runs 3–5 with BVH compaction on; Power Plant, 30 dyn, Ω = 8) is included for completeness but is not reported in the paper.
 
 ### Main-suite rebuild sweep
 
@@ -320,7 +297,7 @@ A JSON array of dynamic mesh entries. Referenced from `benchmark_config.json` vi
 
 ### `configs/robots/<name>.json` fields
 
-A JSON array of robot objects. Referenced from `benchmark_config.json` via `"benchmark_robots"`. The repository includes presets from 1 to 8 robots (plus multiple 8-robot variants). The main-suite sweep uses `max_rays_2_robot.json`, `max_rays_4_robot.json`, `max_rays_6_robot.json`, and `max_rays_8_robot.json`.
+A JSON array of robot objects. Referenced from `benchmark_config.json` via `"benchmark_robots"`. The repository includes presets from 1 to 8 robots (plus multiple 8-robot variants). The main-suite sweep uses `max_rays_2_robot.json`, `max_rays_4_robot.json`, `max_rays_6_robot.json`, and `max_rays_8_robot.json` (`range_max` = 1000 m); the `max_rays_<N>_robot_100.json` variants are identical except for `range_max` = 100 m and are used by the `_100` presets.
 
 ### Test file fields
 
