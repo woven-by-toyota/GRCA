@@ -14,10 +14,10 @@
         "configs/dynamic_meshes/30_dyn_mesh.json"
     ],
     "benchmark_robots": [
-        "configs/robots/max_rays_2_robot_200.json",
-        "configs/robots/max_rays_4_robot_200.json",
-        "configs/robots/max_rays_6_robot_200.json",
-        "configs/robots/max_rays_8_robot_200.json"
+        "configs/robots/max_rays_2_robot_100.json",
+        "configs/robots/max_rays_4_robot_100.json",
+        "configs/robots/max_rays_6_robot_100.json",
+        "configs/robots/max_rays_8_robot_100.json"
     ],
     "active_tests": [
         "configs/tests/main_suite/rebuild_hybrid.json",
