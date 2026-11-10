@@ -35,7 +35,7 @@ using UnityEngine.InputSystem;
 // }
 
 
-public class GrcaLidarCpu : MonoBehaviour {
+public class GRCA_CPU : MonoBehaviour {
   public float HAngleMin;
   public float HAngleMax;
   public uint HNumSamples;
@@ -80,7 +80,7 @@ public class GrcaLidarCpu : MonoBehaviour {
   };
 
   public Triangle BuildTriangle(Vector3 v0, Vector3 v1, Vector3 v2) {
-    var tri = new GrcaLidarCpu.Triangle();
+    var tri = new GRCA_CPU.Triangle();
     tri.Vertices[0] = v0; tri.Vertices[1] = v1; tri.Vertices[2] = v2;
     tri.Edge1  = v1 - v0;
     tri.Edge2  = v2 - v0;
@@ -250,7 +250,7 @@ public class GrcaLidarCpu : MonoBehaviour {
     return Mathf.Sqrt(minDistSq);
   }
             
-  public bool GRCA_Early_T_Filter(Triangle tri) {
+  public bool GRCA_Early_T_Filter(Triangle tri, out float closestVertDist) {
     closestVertDist = float.MaxValue;
     //reject triangles that are on the triangle plane
     if (IsPointOnPlane(transform.position, tri.Center, tri.Normal))                   { return false; }
@@ -268,9 +268,9 @@ public class GrcaLidarCpu : MonoBehaviour {
     float distSqr = Mathf.Max(Vector3.Dot(toCenter, toCenter), _epsilon);
     float lhs = tri.Area * dotNC;
     if (lhs * lhs < _min_apparent_area * _min_apparent_area * distSqr * distSqr * distSqr) { return false; }
-    // // 1-3: range
-    // closestVertDist = ClosestDistanceToTriangle(tri);
-    // if (closestVertDist < RangeMin || closestVertDist > RangeMax)                     { return false; }
+    // 1-3: range
+    closestVertDist = ClosestDistanceToTriangle(tri);
+    if (closestVertDist < RangeMin || closestVertDist > RangeMax)                     { return false; }
     return true;
   }
 

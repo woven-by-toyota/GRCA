@@ -240,12 +240,12 @@ With all angles zero: forward = (0,0,1), up = (0,1,0), right = (1,0,0).
 
 ## Unity CPU Version
 
-`cs/GRCA_CPU.cs` is a standalone C# version of GRCA-CPU. Its component class is `GrcaLidarCpu`, and it uses the Input System package.
+`cs/GRCA_CPU.cs` is a standalone C# version of GRCA-CPU for Unity. It reads keys through the Input System package.
 
-1. Install [Unity Hub](https://docs.unity3d.com/hub/manual/InstallHub.html#install-hub-linux) and add the Input System package to the project
-2. Copy `cs/GRCA_CPU.cs` into the Assets folder and rename it to `GrcaLidarCpu.cs` (Unity requires a component's file name to match its class name)
+1. Install [Unity Hub](https://docs.unity3d.com/hub/manual/InstallHub.html#install-hub-linux), and add the Input System package to the project if it doesn't have it yet
+2. Copy `cs/GRCA_CPU.cs` into the Assets folder
 3. Hierarchy → right-click → `Create Empty`
-4. Select the GameObject → Inspector → `Add Component` → `Grca Lidar Cpu`
+4. Select the GameObject → Inspector → `Add Component` → `GRCA_CPU`
 5. Set the LiDAR parameters in the Inspector (`HNumSamples`, the angle limits, and the range limits default to 0)
 6. Hierarchy → right-click → `3D Object` → `Cube`, place in front of the GameObject
 7. Press Play:

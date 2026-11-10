@@ -18,7 +18,7 @@ public class GRCATriDebugger : ARSim.MonoBehaviour {
   public Color HighlightColor = Color.yellow;
   public float HighlightNormalLength = 0.1f;
   public LayerMask SelectionLayers = ~0; // All layers by default
-  public GrcaLidarCpu LidarCpu;           // source of all LiDAR parameters + transform
+  public GRCA_CPU LidarCpu;           // source of all LiDAR parameters + transform
 
   [Header("Hit Visualization")]
   public Color RmtHitColor   = Color.green;
@@ -382,7 +382,7 @@ public class GRCATriDebugger : ARSim.MonoBehaviour {
   //  HELPERS
   // ══════════════════════════════════════════════════════════════════════════
 
-  private void LogTriSetup(GrcaLidarCpu.Triangle t) {
+  private void LogTriSetup(GRCA_CPU.Triangle t) {
     Debug.Log($"[GRCATriDebugger] Triangle setup:\n" +
               $"  V0={t.Vertices[0]}  V1={t.Vertices[1]}  V2={t.Vertices[2]}\n" +
               $"  Edge1={t.Edge1}  Edge2={t.Edge2}\n" +
