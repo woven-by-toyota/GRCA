@@ -31,6 +31,16 @@ void vis_set_camera(VisState* vs, const float eye[3],
 // Returns true (and resets the flag) when the user pressed O in the window.
 bool vis_capture_requested(VisState* vs);
 
+// Request a PNG capture of the next rendered frame (same as pressing I).
+void vis_request_image(VisState* vs);
+
+// Returns true once after the user pressed I: rgb receives the rendered frame
+// (RGB8, top row first, w*h*3 bytes) exactly as shown in the window.
+bool vis_take_image(VisState* vs, std::vector<unsigned char>& rgb, int& w, int& h);
+
+// Write an RGB8 image (top row first) as an uncompressed PNG.  Returns false on I/O error.
+bool vis_write_png(const std::string& path, int w, int h, const unsigned char* rgb);
+
 // Destroy the window and free resources.
 void vis_destroy(VisState* vs);
 

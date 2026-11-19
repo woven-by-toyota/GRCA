@@ -727,6 +727,9 @@ inline void createSwapchain(VkDevice device, VkPhysicalDevice physicalDevice, Vk
     ci.imageExtent      = extent;
     ci.imageArrayLayers = 1;
     ci.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    // Allow reading the presented image back (Hit Viewer PNG capture) where supported.
+    if (caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+        ci.imageUsage  |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     if (indices.graphicsFamily != indices.presentFamily) {
         ci.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
         ci.queueFamilyIndexCount = 2;
@@ -935,15 +938,16 @@ inline void rebuildSwapchain(VulkanContext& ctx) {
     allocateCommandBuffers(ctx.device, ctx.commandPool, ctx.framebuffers.size(), ctx.commandBuffers);
 }
 
-// Creates a CPU-visible/coherent vertex buffer of the given byte size, maps it,
-// and returns the persistent mapped pointer in mappedData.
+// Creates a CPU-visible/coherent buffer (vertex buffer by default) of the given
+// byte size, maps it, and returns the persistent mapped pointer in mappedData.
 inline void allocateMappedBuffer(VkDevice device, VkPhysicalDevice physicalDevice,
                                   VkDeviceSize size, VkBuffer& buffer,
-                                  VkDeviceMemory& memory, void*& mappedData) {
+                                  VkDeviceMemory& memory, void*& mappedData,
+                                  VkBufferUsageFlags usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) {
     VkBufferCreateInfo bi{};
     bi.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bi.size        = size;
-    bi.usage       = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bi.usage       = usage;
     bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     if (vkCreateBuffer(device, &bi, nullptr, &buffer) != VK_SUCCESS)
         throw std::runtime_error("failed to create buffer");

@@ -55,6 +55,9 @@ The checked-in `benchmark_config.json` is a quick live-preview setup (Lumberyard
 | `bat_capacity` | `800000` | GRCA-CUDA BAT buffer capacity in entries (see [GRCA CUDA](backends.md#grca-cuda)); the span-threshold presets raise it to `4500000` |
 | `visualizer_on`, `mesh_vis_on`, `cone_vis_on` | see [Test file fields](#test-file-fields) | Visualizer defaults; the first active test can override them |
 | `w_cam_position`, `w_cam_forward`, `w_cam_up` | — | Initial visualizer camera pose; the first active test can override them |
+| `vis_window_size` | `[1000, 1000]` | Visualizer window size `[width, height]` in pixels; PNG captures (`I`) use the window's framebuffer size |
+| `auto_capture_frame` | `-1` | Save this frame as a PNG automatically (same as pressing `I`); combine with `w_cam_position`/`w_cam_forward`, `vis_window_size` and `record_frames` for a scripted, reproducible render. `-1` = off |
+| `heat_max` | `0` | Heat map (`mesh_vis_on: 4`): rays-tested count mapped to the brightest colour; `0` = the first frame's maximum. Fix it to compare colours across scenes or runs |
 
 ## Main-suite rebuild sweep
 
@@ -112,7 +115,7 @@ A JSON array of robot objects. Referenced from `benchmark_config.json` via `"ben
 | Field | Default | Description |
 |-------|---------|-------------|
 | `visualizer_on` | `false` | Opens the visualizer window when `true`. Integer values are treated as non-zero/zero enable flags only. |
-| `mesh_vis_on` | `0` | Mesh display mode: `0` = no mesh, `1` = wireframe only, `2` = solid mesh + wireframe overlay (uses per-triangle MTL colors), `3` = same as `2` but forces flat JSON `color` for every mesh (ignores MTL) |
+| `mesh_vis_on` | `0` | Mesh display mode: `0` = no mesh, `1` = wireframe only, `2` = solid mesh + wireframe overlay (uses per-triangle MTL colors), `3` = same as `2` but forces flat JSON `color` for every mesh (ignores MTL), `4` = heat map: solid mesh + wireframe coloured by the rays GRCA tested against each triangle this frame (log scale, dark → light orange; gray = culled). `4` needs backend `grca-cpu` or `grca-cuda`; hit points are coloured by depth (RViz rainbow) and bounding boxes start hidden (`X` toggles) |
 | `cone_vis_on` | `false` | Draw the LiDAR channel cones in the visualizer |
 | `record_frames` | `-1` | Frames to record (perf, hit-dist, and pose); `-1` records nothing and keeps running (see frame-loop termination below) |
 | `lidar_sim_rate` | `10` | Default simulation rate (Hz) for batches that don't set one; only read from the first active test |

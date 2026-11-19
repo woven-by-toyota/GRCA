@@ -50,6 +50,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <climits>
 #include <cmath>
@@ -337,6 +338,62 @@ static std::string make_timestamped_csv_name(const std::string& type,
     std::ostringstream oss;
     oss << out_dir << "/" << prefix << std::put_time(&tm_buf, "%Y%m%d_%H%M%S") << ".csv";
     return oss.str();
+}
+
+// ---------------------------------------------------------------------------
+// Heat map (mesh_vis_on == MESH_VIS_HEAT): rays tested per triangle -> colour.
+// One-hue orange ramp from dark (few rays) to light (many rays) on a log scale;
+// culled triangles (0 rays) are a dim neutral gray below the ramp.  Values are
+// linear RGB because the viewer's swapchain is sRGB.  sRGB hex per stop:
+//   842c01 a13802 be4403 d7561e ee6b37 fe8558 fea889 ffc7b4 ffe5dc   culled: 333333
+// (OKLCH hue 40.6 deg, lightness 0.42 -> 0.94, monotonic.)
+// ---------------------------------------------------------------------------
+static const float kHeatRamp[9][3] = {
+    {0.2300f, 0.0254f, 0.0004f}, {0.3543f, 0.0391f, 0.0007f}, {0.5167f, 0.0570f, 0.0009f},
+    {0.6818f, 0.0931f, 0.0133f}, {0.8572f, 0.1469f, 0.0385f}, {0.9942f, 0.2363f, 0.0987f},
+    {0.9947f, 0.3931f, 0.2508f}, {0.9971f, 0.5740f, 0.4544f}, {0.9966f, 0.7827f, 0.7138f}};
+static const float kHeatCulled = 0.0328f;  // #333333 (linear)
+
+// t in [0,1] along the ramp -> linear RGB.
+static void heatRampColor(double t, float out[3]) {
+    t = std::min(1.0, std::max(0.0, t)) * 8.0;
+    const int   i = std::min(7, (int)t);
+    const float f = (float)(t - i);
+    for (int c = 0; c < 3; ++c) out[c] = kHeatRamp[i][c] * (1.f - f) + kHeatRamp[i + 1][c] * f;
+}
+
+// rays tested -> linear RGB; logMax = log(1 + rays mapped to the top colour).
+static void heatColor(uint32_t rays, double logMax, float out[3]) {
+    if (rays == 0) { out[0] = out[1] = out[2] = kHeatCulled; return; }
+    heatRampColor(logMax > 0.0 ? std::log1p((double)rays) / logMax : 1.0, out);
+}
+
+static unsigned char linToSrgb8(float c) {
+    c = std::min(1.f, std::max(0.f, c));
+    const float s = (c <= 0.0031308f) ? 12.92f * c : 1.055f * std::pow(c, 1.f / 2.4f) - 0.055f;
+    return (unsigned char)std::lround(s * 255.f);
+}
+
+// Write <base>_colorbar.png (culled swatch | gap | log ramp, left to right) and
+// <base>_scale.txt (tick positions in rays) next to a heat-map capture.
+static void writeHeatLegend(const std::string& base, double logMax, uint32_t maxRays) {
+    const int W = 512, H = 32, swatch = 40, gap = 12;
+    std::vector<unsigned char> img((size_t)W * H * 3, 0);
+    for (int x = 0; x < W; ++x) {
+        float c[3] = {0.f, 0.f, 0.f};
+        if (x < swatch) c[0] = c[1] = c[2] = kHeatCulled;
+        else if (x >= swatch + gap) heatRampColor((double)(x - swatch - gap) / (W - swatch - gap - 1), c);
+        for (int y = 0; y < H; ++y)
+            for (int k = 0; k < 3; ++k) img[((size_t)y * W + x) * 3 + k] = linToSrgb8(c[k]);
+    }
+    vis_write_png(base + "_colorbar.png", W, H, img.data());
+    std::ofstream txt(base + "_scale.txt");
+    txt << "rays tested per triangle, summed over all lidars (one frame)\n"
+        << "colour = log(1+rays) / log(1+" << maxRays << ")\n"
+        << "colorbar.png: x<" << swatch << " culled (0 rays, #333333); ramp from x=" << swatch + gap
+        << " (t=0) to x=" << W - 1 << " (t=1)\n";
+    for (double t : {0.0, 0.25, 0.5, 0.75, 1.0})
+        txt << "t=" << t << "  rays=" << std::llround(std::expm1(t * logMax)) << "\n";
 }
 
 // ---------------------------------------------------------------------------
@@ -1322,6 +1379,9 @@ int main(int argc, char** argv)
     bool  cone_vis_global  = false;
     bool  has_cam_pos = false, has_cam_fwd = false;
     float cam_pos_global[3] = {}, cam_fwd_global[3] = {0,0,-1}, cam_up_global[3] = {0,1,0};
+    int   vis_window_w_global = 1000, vis_window_h_global = 1000;
+    double heat_max_global = 0.0;  // heat map: rays count mapped to the top colour (0 = first frame's max)
+    int    auto_capture_global = -1; // frame to save as PNG automatically (-1 = only on 'i')
     {
         auto read_vis = [&](const json& jj) {
             if (jj.contains("visualizer_on")) {
@@ -1351,6 +1411,15 @@ int main(int argc, char** argv)
                 cam_up_global[1] = jj["w_cam_up"][1].get<float>();
                 cam_up_global[2] = jj["w_cam_up"][2].get<float>();
             }
+            if (jj.contains("vis_window_size") && jj["vis_window_size"].is_array()
+                && jj["vis_window_size"].size() == 2) {
+                vis_window_w_global = jj["vis_window_size"][0].get<int>();
+                vis_window_h_global = jj["vis_window_size"][1].get<int>();
+            }
+            if (jj.contains("heat_max"))
+                heat_max_global = jj["heat_max"].get<double>();
+            if (jj.contains("auto_capture_frame"))
+                auto_capture_global = jj["auto_capture_frame"].get<int>();
         };
         read_vis(j);                     // benchmark_config.json
         if (!tests_list.empty()) read_vis(tests_list[0]); // first test can still override
@@ -1605,6 +1674,8 @@ int main(int argc, char** argv)
             scene_cfg.visualizer_on = true;
             scene_cfg.mesh_vis_on   = run_mesh_vis;
             scene_cfg.cone_vis_on   = run_cone_vis;
+            scene_cfg.vis_window_w  = vis_window_w_global;
+            scene_cfg.vis_window_h  = vis_window_h_global;
             if (!vis)
                 vis = vis_init(scene_cfg);
             if (has_cam_pos || has_cam_fwd)
@@ -2271,6 +2342,12 @@ int main(int argc, char** argv)
             long long early_t_sum = 0;
             long long rtic_sum = 0;
             int rtic_min = INT_MAX, rtic_max = -1;
+            // Heat-map mode (mesh_vis_on == MESH_VIS_HEAT)
+            double   heat_log_max  = 0.0;   // log(1 + rays mapped to the top colour); fixed per run
+            uint32_t heat_max_rays = 0;
+            bool     heat_warned   = false;
+            std::vector<float>    heat_colors; // 3 floats per triangle, indexed like tris
+            std::vector<uint32_t> heat_prev;   // last uploaded counts: skip recolouring when unchanged
             while (running) {
                 if (cfg.visualizer_on && vis) {
                     auto now_wall = clk::now();
@@ -2816,6 +2893,59 @@ int main(int argc, char** argv)
 
                 // Visualizer update
                 if (cfg.visualizer_on && vis) {
+                    if (frame == auto_capture_global) vis_request_image(vis);  // saved below as PNG
+                    // Heat map: recolour every triangle by the rays GRCA tested against it this frame.
+                    const std::vector<uint32_t>* heat_work = nullptr;
+                    if (cfg.mesh_vis_on == MESH_VIS_HEAT) {
+                        if (be == "grca-cpu") heat_work = &cpu_tri_work(cpuState);
+#ifdef HAVE_CUDA
+                        else if (be == "grca-cuda") heat_work = &cuda_tri_work(cudaState);
+#endif
+                        if (heat_work && heat_work->size() != tris.size()) heat_work = nullptr;
+                        if (!heat_work && !heat_warned) {
+                            fprintf(stderr, "[heat] mesh_vis_on=4 needs backend grca-cpu or grca-cuda; "
+                                            "'%s' keeps the default colours\n", be.c_str());
+                            heat_warned = true;
+                        }
+                    }
+                    // Static scenes give the same counts every frame: keep the uploaded colours.
+                    if (heat_work && *heat_work != heat_prev) {
+                        heat_prev = *heat_work;
+                        if (heat_log_max <= 0.0) {
+                            const uint32_t frame_max = heat_work->empty() ? 0u
+                                : *std::max_element(heat_work->begin(), heat_work->end());
+                            heat_max_rays = heat_max_global > 0.0 ? (uint32_t)heat_max_global : frame_max;
+                            heat_max_rays = std::max(heat_max_rays, 1u);
+                            heat_log_max  = std::log1p((double)heat_max_rays);
+                            fprintf(stderr, "[heat] colour = log(1+rays)/log(1+%u) (%s); this frame's max = %u; gray = culled\n",
+                                    heat_max_rays, heat_max_global > 0.0 ? "heat_max" : "first frame's max", frame_max);
+                        }
+                        heat_colors.resize(tris.size() * 3);
+                        unsigned long long heat_sum = 0;
+                        size_t heat_tested = 0;
+                        for (size_t k = 0; k < tris.size(); ++k) {
+                            heatColor((*heat_work)[k], heat_log_max, &heat_colors[k * 3]);
+                            heat_sum += (*heat_work)[k];
+                            heat_tested += ((*heat_work)[k] != 0);
+                        }
+                        char rtic_note[48] = "";
+                        if (t.num_rtic >= 0) snprintf(rtic_note, sizeof(rtic_note), " (num_rtic=%d)", t.num_rtic);
+                        fprintf(stderr, "[heat] frame %d: %zu/%zu triangles tested (%.2f%% culled), %llu rays tested%s\n",
+                                frame, heat_tested, tris.size(),
+                                tris.empty() ? 0.0 : 100.0 * (double)(tris.size() - heat_tested) / (double)tris.size(),
+                                heat_sum, rtic_note);
+                        std::vector<VisMesh> svm;
+                        size_t soff = 0;
+                        for (size_t i = 0; i < static_vis_tris.size(); ++i) {
+                            VisMesh vm;
+                            vm.tris       = static_vis_tris[i].data();
+                            vm.count      = static_vis_tris[i].size();
+                            vm.tri_colors = heat_colors.data() + soff * 3;
+                            soff += vm.count;
+                            svm.push_back(vm);
+                        }
+                        vis_set_static_meshes(vis, svm);
+                    }
                     if (!cfg.dynamic_meshes.empty()) {
                         std::vector<VisMesh> dvm;
                         size_t doff = static_tris.size();
@@ -2825,7 +2955,9 @@ int main(int argc, char** argv)
                             vm.tris       = tris.data() + doff;
                             vm.count      = dyn_mesh_tris[i].size();
                             vm.color[0]   = dm.color[0]; vm.color[1] = dm.color[1]; vm.color[2] = dm.color[2];
-                            vm.tri_colors = (cfg.mesh_vis_on >= 3 || dm.color_override || dyn_mesh_colors[i].empty()) ? nullptr : dyn_mesh_colors[i].data();
+                            vm.tri_colors = heat_work ? heat_colors.data() + doff * 3
+                                          : (cfg.mesh_vis_on >= 3 || dm.color_override || dyn_mesh_colors[i].empty()) ? nullptr
+                                          : dyn_mesh_colors[i].data();
                             dvm.push_back(vm);
                             doff += dyn_mesh_tris[i].size();
                         }
@@ -2893,6 +3025,26 @@ int main(int argc, char** argv)
                     std::string csvPath = make_timestamped_csv_name("hit_view_" + be, cfg, batch_dir);
                     writeCSV(csvPath, hits, ro_ids, li_ids);
                     fprintf(stderr, "  Wrote %s  (%zu rays)\n", csvPath.c_str(), hits.size());
+                }
+
+                // PNG capture ('i' press or auto_capture_frame): the frame exactly as shown in the viewer
+                if (vis) {
+                    std::vector<unsigned char> img;
+                    int iw = 0, ih = 0;
+                    if (vis_take_image(vis, img, iw, ih)) {
+                        std::string png = make_timestamped_csv_name("capture_" + be, cfg, batch_dir);
+                        png.replace(png.size() - 4, 4, ".png");
+                        if (vis_write_png(png, iw, ih, img.data())) {
+                            fprintf(stderr, "  Wrote %s  (%dx%d)\n", png.c_str(), iw, ih);
+                            if (cfg.mesh_vis_on == MESH_VIS_HEAT && heat_log_max > 0.0) {
+                                const std::string base = png.substr(0, png.size() - 4);
+                                writeHeatLegend(base, heat_log_max, heat_max_rays);
+                                fprintf(stderr, "  Wrote %s_colorbar.png, %s_scale.txt\n", base.c_str(), base.c_str());
+                            }
+                        } else {
+                            fprintf(stderr, "  Failed to write %s\n", png.c_str());
+                        }
+                    }
                 }
 
                 // Perf CSV row
