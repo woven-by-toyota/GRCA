@@ -204,6 +204,8 @@ cp presets/benchmark_config_3080ti_main_suite.json benchmark_config.json
 
 `benchmark_config_3080ti_compact_cost.json` (the `_compact` main-suite tests; Power Plant, 30 dyn, Ω = 8) is included for completeness but is not reported in the paper.
 
+`benchmark_config_static_heat_map.json` is not a benchmark: it opens the Hit Viewer in heat-map mode (`mesh_vis_on: 4`, `configs/tests/static_visual_heat.json`) on a static Power Plant scene with GRCA-CUDA, colouring every triangle by the rays GRCA tested against it (gray = culled). It runs until the window is closed; press `I` to save the view as a PNG together with its colour bar and scale. The window is 1220 × 1000 (`vis_window_size`); camera, LiDAR and scene are set as in any other config (see [Visualizer fields](docs/configuration.md) and [Tools](docs/tools.md)).
+
 Notes on what the presets run:
 - "hybrid" in `best_hybrid*` and `configs/tests/3080ti mobile/fast_hybrid_find/` refers to the periodic-rebuild (`prN`) sweep, not the hybrid backends.
 - `best_hybrid_chaos` runs OptiX only, for 10 frames (`bvh_sweep_*_chaos.json`); `best_hybrid` runs OptiX and Embree for 50 frames.

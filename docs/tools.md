@@ -31,6 +31,9 @@ Back to the [README](../README.md).
 | **C** | Toggle lidar cones on/off *(Hit Viewer only)* |
 | **F** | Focus camera on hit-point bounding box (keeps orientation) |
 | **O** | Write hit CSV for current frame *(Hit Viewer only)* |
+| **H** | Toggle hit points on/off. With `mesh_vis_on: 4` the points are coloured by depth with the RViz rainbow map (nearest magenta/blue → cyan → green → yellow → farthest red, over the frame's hit-distance range); otherwise they are red *(Hit Viewer only)* |
+| **X** | Toggle bounding-box overlays on/off (off by default with `mesh_vis_on: 4`) *(Hit Viewer only)* |
+| **I** | Save the current view as a PNG in the batch output folder; with `mesh_vis_on: 4` also writes `<name>_colorbar.png` and `<name>_scale.txt` (colour-bar tick values in rays) *(Hit Viewer only)* |
 | **Esc** | Quit |
 
 

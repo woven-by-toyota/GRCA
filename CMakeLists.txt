@@ -103,6 +103,7 @@ if(_SHADER_COMPILER)
     COMMAND ${CMAKE_COMMAND} -E make_directory "${_shader_build_dir}"
     COMMAND ${_SHADER_COMPILER} ${_SHADER_FLAGS} "${_shader_src_dir}/hit_point.vert" -o "${_shader_build_dir}/hit_point.vert.spv"
     COMMAND ${_SHADER_COMPILER} ${_SHADER_FLAGS} "${_shader_src_dir}/hit_point.frag" -o "${_shader_build_dir}/hit_point.frag.spv"
+    COMMAND ${_SHADER_COMPILER} ${_SHADER_FLAGS} "${_shader_src_dir}/hit_point_heat.frag" -o "${_shader_build_dir}/hit_point_heat.frag.spv"
     COMMAND ${_SHADER_COMPILER} ${_SHADER_FLAGS} "${_shader_src_dir}/mesh_wire.vert" -o "${_shader_build_dir}/mesh_wire.vert.spv"
     COMMAND ${_SHADER_COMPILER} ${_SHADER_FLAGS} "${_shader_src_dir}/mesh_wire.frag" -o "${_shader_build_dir}/mesh_wire.frag.spv"
     COMMAND ${_SHADER_COMPILER} ${_SHADER_FLAGS} "${_shader_src_dir}/cone.frag" -o "${_shader_build_dir}/cone.frag.spv"
