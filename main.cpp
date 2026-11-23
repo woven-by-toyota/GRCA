@@ -3245,8 +3245,8 @@ int main(int argc, char** argv)
                                        << "pixel value v (0..255): depth = " << dn << " + (1 - v/255) * " << (df - dn) << "\n"
                                        << "white (255) = " << dn << " or nearer, black (0) = " << df << " or farther / background\n";
                                 else
-                                    dt << "hit points: RViz rainbow over LiDAR range\n"
-                                       << "magenta = " << dn << " or nearer ... red = " << df << " or farther\n";
+                                    dt << "hit points: rainbow over LiDAR range (near red -> far blue)\n"
+                                       << "red = " << dn << " or nearer ... blue = " << df << " or farther\n";
                                 fprintf(stderr, "  Wrote %s_depth.txt\n", base.c_str());
                             }
                         } else {

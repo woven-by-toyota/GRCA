@@ -2,11 +2,11 @@
 layout(location = 0) in float vDistNorm;
 layout(location = 0) out vec4 outColor;
 
-// RViz "Rainbow" colour transformer (getRainbowColor in rviz point_cloud_transformers):
-// 0 = magenta -> blue -> cyan -> green -> yellow -> 1 = red.
+// RViz "Rainbow" colour transformer (getRainbowColor in rviz point_cloud_transformers) without its
+// magenta end: 0 = blue -> cyan -> green -> yellow -> 1 = red.  Applied reversed below (near = red, far = blue).
 vec3 rvizRainbow(float value) {
     value = clamp(value, 0.0, 1.0);
-    float h = value * 5.0 + 1.0;
+    float h = value * 4.0 + 2.0;    // RViz: value * 5 + 1 (starts at magenta)
     int   i = int(floor(h));
     float f = h - float(i);
     if ((i & 1) == 0) f = 1.0 - f;  // i even
@@ -28,5 +28,6 @@ vec3 srgbToLinear(vec3 c) {
 void main() {
     if (vDistNorm < 0.0) discard;  // miss
     // vDistNorm: hit distance normalised over this frame's nearest..farthest hit.
-    outColor = vec4(srgbToLinear(rvizRainbow(vDistNorm)), 1.0);
+    // Near = red (warm = close, like white = near in the grayscale pass) -> far = blue.
+    outColor = vec4(srgbToLinear(rvizRainbow(1.0 - vDistNorm)), 1.0);
 }

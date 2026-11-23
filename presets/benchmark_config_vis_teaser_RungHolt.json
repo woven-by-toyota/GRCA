@@ -5,7 +5,7 @@
         "configs/scenes/RungHolt.json"
     ],
     "benchmark_robots": [
-        "configs/robots/vis_teaser_robot.json"
+        "configs/robots/vis_teaser_robot_200m.json"
     ],
     "active_tests": [
         "configs/tests/vis_teaser.json"

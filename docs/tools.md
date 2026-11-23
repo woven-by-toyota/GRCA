@@ -32,7 +32,7 @@ Back to the [README](../README.md).
 | **F** | Focus camera on hit-point bounding box (keeps orientation) |
 | **O** | Write hit CSV for current frame *(Hit Viewer only)* |
 | **H** | Toggle hit points on/off. In heat-map mode the points are depth-coloured (see **G**); otherwise they are red *(Hit Viewer only)* |
-| **G** | Heat-map hit points: switch between the RViz rainbow over LiDAR range (nearest magenta/blue → cyan → green → yellow → farthest red) and grayscale linear camera depth (white = near, black = far) *(Hit Viewer only)* |
+| **G** | Heat-map hit points: switch between a rainbow over LiDAR range (the RViz palette without its magenta end, reversed: nearest red → yellow → green → cyan → farthest blue) and grayscale linear camera depth (white = near, black = far) *(Hit Viewer only)* |
 | **V** | Cycle the mesh colouring: wireframe → solid → flat colour → heat map (`mesh_vis_on` 1–4) *(Hit Viewer only)* |
 | **X** | Toggle bounding-box overlays on/off (off by default with `mesh_vis_on: 4`) *(Hit Viewer only)* |
 | **I** | Save the current view as a PNG in the batch output folder; with `mesh_vis_on: 4` also writes `<name>_colorbar.png` and `<name>_scale.txt` (colour-bar tick values in rays) *(Hit Viewer only)* |

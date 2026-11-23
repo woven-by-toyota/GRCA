@@ -24,7 +24,7 @@
                 "vmax": 1.570796,
                 "vnum": 128,
                 "range_min": 0.05,
-                "range_max": 1000.0,
+                "range_max": 50.0,
                 "position": [
                     0.0,
                     0.0,

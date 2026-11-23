@@ -42,7 +42,7 @@ struct VisView {
     int cones          = -1;  // 0/1: LiDAR channel cones
     int static_meshes  = -1;  // 0/1: static meshes
     int dynamic_meshes = -1;  // 0/1: dynamic meshes
-    int depth_colormap = -1;  // heat-map hit points: 0 = RViz rainbow, 1 = grayscale
+    int depth_colormap = -1;  // heat-map hit points: 0 = rainbow (near red -> far blue), 1 = grayscale
 };
 void vis_apply_view(VisState* vs, const VisView& v);
 

@@ -5,7 +5,7 @@
         "configs/scenes/PowerPlant.json"
     ],
     "benchmark_robots": [
-        "configs/robots/vis_teaser_robot.json"
+        "configs/robots/vis_teaser_robot_15m.json"
     ],
     "active_tests": [
         "configs/tests/vis_teaser.json"
@@ -21,20 +21,20 @@
             "name": "1_plain",
             "robot_w_positions": [
                 [
-                    24.67,
-                    10.8,
-                    71.21
+                    -2.197,
+                    11.404,
+                    78.618
                 ]
             ],
             "w_cam_position": [
-                18.836,
-                14.925,
-                65.376
+                -5.733,
+                13.904,
+                82.154
             ],
             "w_cam_forward": [
-                0.6168,
-                -0.489,
-                0.6168
+                0.6063,
+                -0.5145,
+                -0.6063
             ],
             "aabb_vis_on": false,
             "cone_vis_on": false,
@@ -46,20 +46,20 @@
             "name": "2_heat",
             "robot_w_positions": [
                 [
-                    24.67,
-                    10.8,
-                    71.21
+                    -2.197,
+                    11.404,
+                    78.618
                 ]
             ],
             "w_cam_position": [
-                18.836,
-                14.925,
-                65.376
+                -5.733,
+                13.904,
+                82.154
             ],
             "w_cam_forward": [
-                0.6168,
-                -0.489,
-                0.6168
+                0.6063,
+                -0.5145,
+                -0.6063
             ],
             "aabb_vis_on": false,
             "cone_vis_on": false,
@@ -71,20 +71,20 @@
             "name": "3_rainbow",
             "robot_w_positions": [
                 [
-                    24.67,
-                    10.8,
-                    71.21
+                    -2.197,
+                    11.404,
+                    78.618
                 ]
             ],
             "w_cam_position": [
-                18.836,
-                14.925,
-                65.376
+                -5.733,
+                13.904,
+                82.154
             ],
             "w_cam_forward": [
-                0.6168,
-                -0.489,
-                0.6168
+                0.6063,
+                -0.5145,
+                -0.6063
             ],
             "aabb_vis_on": false,
             "cone_vis_on": false,
@@ -99,20 +99,20 @@
             "name": "4_gray",
             "robot_w_positions": [
                 [
-                    24.67,
-                    10.8,
-                    71.21
+                    -2.197,
+                    11.404,
+                    78.618
                 ]
             ],
             "w_cam_position": [
-                18.836,
-                14.925,
-                65.376
+                -5.733,
+                13.904,
+                82.154
             ],
             "w_cam_forward": [
-                0.6168,
-                -0.489,
-                0.6168
+                0.6063,
+                -0.5145,
+                -0.6063
             ],
             "aabb_vis_on": false,
             "cone_vis_on": false,

@@ -29,7 +29,7 @@ struct VisState : OrbitCamera {
 	bool conesVisible     = false;
 	bool hitsVisible      = true;   // H toggles
 	bool aabbsVisible     = true;   // X toggles; off by default in heat-map mode
-	int  depthColormap    = 0;      // heat-map hit points: 0 = RViz rainbow, 1 = grayscale (G toggles)
+	int  depthColormap    = 0;      // heat-map hit points: 0 = rainbow (near red -> far blue), 1 = grayscale (G toggles)
 	bool scripted         = false;  // vis_shots / auto_capture run: ignore keyboard/mouse (Esc still quits)
 	bool  depthShown      = false;  // last frame drew depth-coloured points
 	float depthNear = 0.f, depthFar = 0.f;  // their colour range (LiDAR range or camera depth)
@@ -42,7 +42,7 @@ struct VisState : OrbitCamera {
 
 static VulkanContext g_vk;
 
-// Heat-map mode only: hit points coloured by depth (RViz rainbow, hit_point_heat.frag).
+// Heat-map mode only: hit points coloured by depth (rainbow near red -> far blue, hit_point_heat.frag).
 static VkPipeline g_heatPointPipeline     = VK_NULL_HANDLE;
 static VkPipeline g_heatPointGrayPipeline = VK_NULL_HANDLE;  // grayscale depth (hit_point_heat_gray.frag)
 
