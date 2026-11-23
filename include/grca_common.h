@@ -32,6 +32,7 @@ struct StaticMesh {
     float scale = 1.0f;
     float color[3] = {0.7f, 0.7f, 0.7f}; // RGB, default gray
     bool color_override = false; // if true, color replaces per-triangle MTL colors
+    float wire_color[3] = {-1.f, -1.f, -1.f}; // viewer edge colour; negative = 30% of the fill colour
 };
 
 // =============================================================================
@@ -44,6 +45,7 @@ struct DynamicMesh {
     float scale = 1.0f;
     float color[3] = {0.7f, 0.7f, 0.7f}; // RGB, default gray
     bool color_override = false; // if true, color replaces per-triangle MTL colors
+    float wire_color[3] = {-1.f, -1.f, -1.f}; // viewer edge colour; negative = 30% of the fill colour
 };
 
 // =============================================================================
@@ -125,6 +127,7 @@ struct RunConfig {
     bool cone_vis_on    = false;          // true = render lidar channel cones
     int  vis_window_w   = 1000;           // viewer window size in pixels (PNG captures use it)
     int  vis_window_h   = 1000;
+    bool vis_scripted   = false;          // vis_shots / auto_capture_frame run: unfocused window, no vsync wait
 };
 
 // =============================================================================

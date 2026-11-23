@@ -34,6 +34,27 @@ bool vis_capture_requested(VisState* vs);
 // Request a PNG capture of the next rendered frame (same as pressing I).
 void vis_request_image(VisState* vs);
 
+// Runtime view settings; fields left at -1 keep their current value.
+struct VisView {
+    int mesh_mode      = -1;  // mesh_vis_on value: 0 = hide meshes, 1..4 = colouring (see RunConfig)
+    int hits           = -1;  // 0/1: LiDAR hit points
+    int aabbs          = -1;  // 0/1: bounding-box overlays
+    int cones          = -1;  // 0/1: LiDAR channel cones
+    int static_meshes  = -1;  // 0/1: static meshes
+    int dynamic_meshes = -1;  // 0/1: dynamic meshes
+    int depth_colormap = -1;  // heat-map hit points: 0 = RViz rainbow, 1 = grayscale
+};
+void vis_apply_view(VisState* vs, const VisView& v);
+
+// True if the last frame drew depth-coloured hit points (heat-map mode, points on); then
+// near/far is their colour range and colormap 0 = rainbow over LiDAR range, 1 = grayscale
+// linear camera depth (white = near, black = far).
+bool vis_depth_mapping(const VisState* vs, float& near, float& far, int& colormap);
+
+// Mesh colouring currently selected (mesh_vis_on semantics, 1..4), also while
+// meshes are hidden; changes with the V key and vis_apply_view.
+int vis_mesh_mode(const VisState* vs);
+
 // Returns true once after the user pressed I: rgb receives the rendered frame
 // (RGB8, top row first, w*h*3 bytes) exactly as shown in the window.
 bool vis_take_image(VisState* vs, std::vector<unsigned char>& rgb, int& w, int& h);
@@ -52,6 +73,7 @@ struct VisMesh {
     size_t       count;
     float        color[3]    = {0.7f, 0.7f, 0.7f};
     const float* tri_colors  = nullptr; // per-triangle RGB (count*3 floats), or nullptr
+    float        wire_color[3] = {-1.f, -1.f, -1.f}; // edge colour; negative = 30% of the fill colour
 };
 
 // Upload all mesh wireframes in one call (replaces previous wireframe data).

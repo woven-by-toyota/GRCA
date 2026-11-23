@@ -58,6 +58,9 @@ The checked-in `benchmark_config.json` is a quick live-preview setup (Lumberyard
 | `vis_window_size` | `[1000, 1000]` | Visualizer window size `[width, height]` in pixels; PNG captures (`I`) use the window's framebuffer size |
 | `auto_capture_frame` | `-1` | Save this frame as a PNG automatically (same as pressing `I`); combine with `w_cam_position`/`w_cam_forward`, `vis_window_size` and `record_frames` for a scripted, reproducible render. `-1` = off |
 | `heat_max` | `0` | Heat map (`mesh_vis_on: 4`): rays-tested count mapped to the brightest colour; `0` = the first frame's maximum. Fix it to compare colours across scenes or runs |
+| `hit_vis_on`, `aabb_vis_on`, `static_mesh_vis_on`, `dynamic_mesh_vis_on` | on (`aabb_vis_on` off with `mesh_vis_on: 4`) | Initial visibility of hit points, bounding boxes, static and dynamic meshes (same as the `H`, `X`, `M`, `B` keys) |
+| `hit_depth_colormap` | `"rainbow"` | Heat map hit points: `"rainbow"` = RViz rainbow over LiDAR range, `"gray"` = linear camera depth like a depth pass (white = near, black = far); both span the 2nd–98th percentile of the frame's values |
+| `vis_shots` | — | Scripted captures: a list of `{frame, batch, name, w_cam_position, w_cam_forward, robot_w_positions, mesh_vis_on, hit_vis_on, aabb_vis_on, cone_vis_on, static_mesh_vis_on, dynamic_mesh_vis_on, hit_depth_colormap}`. At `frame` (and only in batch `batch` of the test, if given) the camera and view are applied (robots are moved first in static runs) and the view is saved as `capture_<name>_f<frame>_*.png`, with a `_depth.txt` (depth range) when depth-coloured points are shown. Scripted runs open the window without keyboard focus, ignore keyboard and mouse input (only `Esc` still quits) so stray input cannot move the camera, and present without vsync, so a covered window cannot stall them |
 
 ## Main-suite rebuild sweep
 
@@ -115,6 +118,7 @@ A JSON array of robot objects. Referenced from `benchmark_config.json` via `"ben
 | Field | Default | Description |
 |-------|---------|-------------|
 | `visualizer_on` | `false` | Opens the visualizer window when `true`. Integer values are treated as non-zero/zero enable flags only. |
+| `lidar_stats` | `false` | Write `lidar_stats_*.csv` (one row per lidar per frame: position, hit count, depth quantiles, distance straight down/up, `edge_frac` = share of neighbouring rays whose depth jumps > 10%); used to pick LiDAR spots for figures |
 | `mesh_vis_on` | `0` | Mesh display mode: `0` = no mesh, `1` = wireframe only, `2` = solid mesh + wireframe overlay (uses per-triangle MTL colors), `3` = same as `2` but forces flat JSON `color` for every mesh (ignores MTL), `4` = heat map: solid mesh + wireframe coloured by the rays GRCA tested against each triangle this frame (log scale, dark → light orange; gray = culled). `4` needs backend `grca-cpu` or `grca-cuda`; hit points are coloured by depth (RViz rainbow) and bounding boxes start hidden (`X` toggles) |
 | `cone_vis_on` | `false` | Draw the LiDAR channel cones in the visualizer |
 | `record_frames` | `-1` | Frames to record (perf, hit-dist, and pose); `-1` records nothing and keeps running (see frame-loop termination below) |
@@ -177,10 +181,11 @@ See [BVH update mode](backends.md#bvh-update-mode-optix-and-embree) for what `bv
 |-------|-------------|
 | `file` | Path to `.obj` (relative to working dir) |
 | `w_position` | World-space offset `[x, y, z]` |
-| `w_forward`, `w_up` | Initial orientation (dynamic meshes only) |
+| `w_forward`, `w_up` | Initial orientation (dynamic meshes only), applied once at load: mesh-local z → `w_forward`, y → `w_up`; default = as modelled |
 | `scale` | Scale factor |
 | `color` | Display color `[r, g, b]` |
 | `color_override` | `true` = always draw with `color` instead of the mesh's MTL colors |
+| `wire_color` | Optional `[r, g, b]` edge colour for the viewer's wireframe overlay (static and dynamic meshes); default = 30% of the fill colour. E.g. black `color` + `color_override` with white `wire_color` draws the mesh as white triangle edges on black (`configs/scenes/Lumberyard_all_vis.json`) |
 
 ## `robots` / `lidars` fields
 

@@ -1556,9 +1556,10 @@ struct CudaState {
     bool           debug   = false;
     unsigned int*  d_debug = nullptr;  // [0]=earlyFilterTCount [1]=rticCount; null when !debug
 
-    // Heat-map mode only (mesh_vis_on == MESH_VIS_HEAT): rays tested per triangle.
-    unsigned int*         d_triWork = nullptr;  // N_TRIS counters on the GPU; null otherwise
-    std::vector<uint32_t> h_triWork;            // last frame's counts, indexed like tris
+    // Heat map (mesh_vis_on == MESH_VIS_HEAT): rays tested per triangle.  Allocated whenever
+    // the viewer is open so the mode can be switched at runtime; filled only in heat-map frames.
+    unsigned int*         d_triWork = nullptr;  // N_TRIS counters on the GPU; null without viewer
+    std::vector<uint32_t> h_triWork;            // last heat-map frame's counts, indexed like tris; empty otherwise
 };
 
 // ---------------------------------------------------------------------------
@@ -1718,7 +1719,7 @@ CudaState* init_cuda(const RunConfig& r,
     CHECK_CUDA(cudaMalloc(&s->d_index,  s->N_TRIS * 3u               * sizeof(unsigned int)));
     if (s->debug)
         CHECK_CUDA(cudaMalloc(&s->d_debug, 2 * sizeof(unsigned int)));
-    if (r.visualizer_on && r.mesh_vis_on == MESH_VIS_HEAT && s->N_TRIS > 0)
+    if (r.visualizer_on && s->N_TRIS > 0)
         CHECK_CUDA(cudaMalloc(&s->d_triWork, s->N_TRIS * sizeof(unsigned int)));
 
     auto tInit1 = std::chrono::steady_clock::now();
@@ -1812,16 +1813,18 @@ void run_cuda_frame(CudaState*               s,
     }
     if (s->d_debug)
         CHECK_CUDA(cudaMemsetAsync(s->d_debug, 0, 2 * sizeof(unsigned int), s->stream));
-    if (s->d_triWork)
-        CHECK_CUDA(cudaMemsetAsync(s->d_triWork, 0, s->N_TRIS * sizeof(unsigned int), s->stream));
+    // Count rays per triangle only while the heat map is shown (benchmark kernels otherwise).
+    unsigned int* d_triWork = (s->d_triWork && r.mesh_vis_on == MESH_VIS_HEAT) ? s->d_triWork : nullptr;
+    if (d_triWork)
+        CHECK_CUDA(cudaMemsetAsync(d_triWork, 0, s->N_TRIS * sizeof(unsigned int), s->stream));
     launchGRCA_EarlyPass(s->d_verts, s->d_index, s->d_rod, s->d_rays,
                         s->d_triRay, s->d_unif, (unsigned int)s->N_TRIS,
                         s->ROBOT_COUNT, s->LIDAR_COUNT,
                         s->maxPreprocessSweepCount, s->maxPreprocessChannelCount,
-                        s->d_debug, s->d_triWork, s->stream);
+                        s->d_debug, d_triWork, s->stream);
     DispatchLatePass<<<1, 1, 0, s->stream>>>(s->d_out, s->d_rays, s->d_unif,
                                              s->d_rod, s->d_triRay, s->d_verts, s->d_index, s->ROBOT_COUNT,
-                                             s->d_debug, s->d_triWork);
+                                             s->d_debug, d_triWork);
 
     launchRayCastOutputAsFloat(s->d_out, s->d_rays, s->d_rod,
                                s->ROBOT_COUNT, MAX_LIDAR_RAY_COUNT, s->stream);
@@ -1848,10 +1851,12 @@ void run_cuda_frame(CudaState*               s,
             t.num_early_t = (int)h_dbg[0];
             t.num_rtic    = (int)h_dbg[1];
         }
-        if (s->d_triWork) {
+        if (d_triWork) {
             s->h_triWork.resize(s->N_TRIS);
-            CHECK_CUDA(cudaMemcpy(s->h_triWork.data(), s->d_triWork,
+            CHECK_CUDA(cudaMemcpy(s->h_triWork.data(), d_triWork,
                                   s->N_TRIS * sizeof(unsigned int), cudaMemcpyDeviceToHost));
+        } else {
+            s->h_triWork.clear();
         }
     }
 

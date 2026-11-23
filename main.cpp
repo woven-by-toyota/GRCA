@@ -1157,6 +1157,8 @@ static RunConfig parseConfig(const json& j, float& lidar_sim_rate, int& auto_hit
                 for (int i = 0; i < 3; ++i) sm.color[i] = jm["color"][i].get<float>();
             else { sm.color[0] = 0.7f; sm.color[1] = 0.7f; sm.color[2] = 0.7f; }
             sm.color_override = jm.value("color_override", false);
+            if (jm.contains("wire_color") && jm["wire_color"].is_array() && jm["wire_color"].size() == 3)
+                for (int i = 0; i < 3; ++i) sm.wire_color[i] = jm["wire_color"][i].get<float>();
             cfg.static_meshes.push_back(sm);
         }
     }
@@ -1184,6 +1186,8 @@ static RunConfig parseConfig(const json& j, float& lidar_sim_rate, int& auto_hit
                 for (int i = 0; i < 3; ++i) dm.color[i] = jm["color"][i].get<float>();
             else { dm.color[0] = 0.7f; dm.color[1] = 0.7f; dm.color[2] = 0.7f; }
             dm.color_override = jm.value("color_override", false);
+            if (jm.contains("wire_color") && jm["wire_color"].is_array() && jm["wire_color"].size() == 3)
+                for (int i = 0; i < 3; ++i) dm.wire_color[i] = jm["wire_color"][i].get<float>();
             cfg.dynamic_meshes.push_back(dm);
         }
     }
@@ -1382,6 +1386,18 @@ int main(int argc, char** argv)
     int   vis_window_w_global = 1000, vis_window_h_global = 1000;
     double heat_max_global = 0.0;  // heat map: rays count mapped to the top colour (0 = first frame's max)
     int    auto_capture_global = -1; // frame to save as PNG automatically (-1 = only on 'i')
+    VisView vis_view_global;         // hit_vis_on / aabb_vis_on / static_mesh_vis_on / dynamic_mesh_vis_on
+    // vis_shots: scripted captures — at `frame`, apply camera + view, then save a PNG named after `name`.
+    struct VisShot {
+        int frame = -1;
+        int batch = -1;               // optional: only in this batch of the test (-1 = every batch)
+        std::string name;
+        bool has_pos = false, has_fwd = false;
+        float pos[3] = {}, fwd[3] = {0.f, 0.f, -1.f};
+        VisView view;
+        std::vector<Vec3> robot_pos;  // optional: move robots 0..N-1 (static runs) before this frame
+    };
+    std::vector<VisShot> vis_shots_global;
     {
         auto read_vis = [&](const json& jj) {
             if (jj.contains("visualizer_on")) {
@@ -1420,6 +1436,53 @@ int main(int argc, char** argv)
                 heat_max_global = jj["heat_max"].get<double>();
             if (jj.contains("auto_capture_frame"))
                 auto_capture_global = jj["auto_capture_frame"].get<int>();
+            // View flags shared by the top level and each vis_shots entry.
+            auto read_view = [](const json& o, VisView& v) {
+                auto flag = [&](const char* key, int& dst) {
+                    if (o.contains(key)) dst = o[key].is_boolean() ? (o[key].get<bool>() ? 1 : 0) : (o[key].get<int>() != 0);
+                };
+                if (o.contains("mesh_vis_on"))
+                    v.mesh_mode = o["mesh_vis_on"].is_boolean() ? (o["mesh_vis_on"].get<bool>() ? 1 : 0) : o["mesh_vis_on"].get<int>();
+                flag("hit_vis_on",          v.hits);
+                flag("aabb_vis_on",         v.aabbs);
+                flag("cone_vis_on",         v.cones);
+                flag("static_mesh_vis_on",  v.static_meshes);
+                flag("dynamic_mesh_vis_on", v.dynamic_meshes);
+                if (o.contains("hit_depth_colormap"))  // heat-map hit points: "rainbow" (RViz) or "gray"
+                    v.depth_colormap = (o["hit_depth_colormap"].get<std::string>() == "gray") ? 1 : 0;
+            };
+            {
+                VisView top;
+                read_view(jj, top);
+                top.mesh_mode = -1; top.cones = -1;  // mesh_vis_on / cone_vis_on keep their existing handling
+                if (top.hits           >= 0) vis_view_global.hits           = top.hits;
+                if (top.aabbs          >= 0) vis_view_global.aabbs          = top.aabbs;
+                if (top.static_meshes  >= 0) vis_view_global.static_meshes  = top.static_meshes;
+                if (top.dynamic_meshes >= 0) vis_view_global.dynamic_meshes = top.dynamic_meshes;
+                if (top.depth_colormap >= 0) vis_view_global.depth_colormap = top.depth_colormap;
+            }
+            if (jj.contains("vis_shots") && jj["vis_shots"].is_array()) {
+                vis_shots_global.clear();
+                for (const auto& o : jj["vis_shots"]) {
+                    VisShot sh;
+                    sh.frame = o.value("frame", -1);
+                    sh.batch = o.value("batch", -1);
+                    sh.name  = o.value("name", std::string("shot") + std::to_string(vis_shots_global.size()));
+                    if (o.contains("w_cam_position") && o["w_cam_position"].is_array()) {
+                        for (int k = 0; k < 3; ++k) sh.pos[k] = o["w_cam_position"][k].get<float>();
+                        sh.has_pos = true;
+                    }
+                    if (o.contains("w_cam_forward") && o["w_cam_forward"].is_array()) {
+                        for (int k = 0; k < 3; ++k) sh.fwd[k] = o["w_cam_forward"][k].get<float>();
+                        sh.has_fwd = true;
+                    }
+                    read_view(o, sh.view);
+                    if (o.contains("robot_w_positions") && o["robot_w_positions"].is_array())
+                        for (const auto& rp : o["robot_w_positions"])
+                            sh.robot_pos.push_back({rp[0].get<float>(), rp[1].get<float>(), rp[2].get<float>()});
+                    vis_shots_global.push_back(sh);
+                }
+            }
         };
         read_vis(j);                     // benchmark_config.json
         if (!tests_list.empty()) read_vis(tests_list[0]); // first test can still override
@@ -1462,6 +1525,21 @@ int main(int argc, char** argv)
     for (const auto& dm : scene_cfg.dynamic_meshes) {
         std::vector<float> tri_colors;
         dyn_mesh_tris.push_back(loadOBJ(dm.file, tri_colors));
+        // Optional mesh orientation from the config (w_forward / w_up): rotate the mesh-local
+        // vertices once, local (x, y, z) -> x*right + y*up + z*forward.  Default = identity.
+        {
+            const Pose& o = dm.w_pose;
+            const bool identity = o.forward.x == 0.f && o.forward.y == 0.f && o.forward.z == 1.f &&
+                                  o.up.x == 0.f && o.up.y == 1.f && o.up.z == 0.f;
+            if (!identity)
+                for (auto& tri : dyn_mesh_tris.back())
+                    for (int k = 0; k < 3; ++k) {
+                        const float x = tri.v[k][0], y = tri.v[k][1], z = tri.v[k][2];
+                        tri.v[k][0] = x * o.right.x + y * o.up.x + z * o.forward.x;
+                        tri.v[k][1] = x * o.right.y + y * o.up.y + z * o.forward.y;
+                        tri.v[k][2] = x * o.right.z + y * o.up.z + z * o.forward.z;
+                    }
+        }
         dyn_mesh_colors.push_back(std::move(tri_colors));
     }
 
@@ -1520,6 +1598,8 @@ int main(int argc, char** argv)
         static_aabb[0]=xmn; static_aabb[1]=ymn; static_aabb[2]=zmn;
         static_aabb[3]=xmx; static_aabb[4]=ymx; static_aabb[5]=zmx;
         has_static_aabb = true;
+        fprintf(stderr, "[scene] static AABB min (%.3f, %.3f, %.3f)  max (%.3f, %.3f, %.3f)\n",
+                xmn, ymn, zmn, xmx, ymx, zmx);
     } else if (no_benchmark_scenes) {
         // No benchmark scene provided: fall back to a fixed 10x10x10 world box.
         static_aabb[0] = -5.f; static_aabb[1] = -5.f; static_aabb[2] = -5.f;
@@ -1622,6 +1702,8 @@ int main(int argc, char** argv)
         if (cur_run_j.contains("record_frames"))
             record_frames_val = cur_run_j["record_frames"].get<int>();
         int perf_record_frames_global     = record_frames_val;
+        // lidar_stats: per-frame, per-lidar hit statistics CSV (used to pick LiDAR spots for figures)
+        const bool lidar_stats_global = cur_run_j.value("lidar_stats", false);
         int hit_dist_record_frames_global = record_frames_val;
 
         bool skip_validation = j.value("skip_validation", true);
@@ -1676,12 +1758,19 @@ int main(int argc, char** argv)
             scene_cfg.cone_vis_on   = run_cone_vis;
             scene_cfg.vis_window_w  = vis_window_w_global;
             scene_cfg.vis_window_h  = vis_window_h_global;
+            scene_cfg.vis_scripted  = !vis_shots_global.empty() || auto_capture_global >= 0;
             if (!vis)
                 vis = vis_init(scene_cfg);
             if (has_cam_pos || has_cam_fwd)
                 vis_set_camera(vis, cam_pos_global,
                                has_cam_fwd ? cam_fwd_global : nullptr,
                                cam_up_global);
+            {   // The viewer persists across runs: apply this run's mode and the configured view flags.
+                VisView rv = vis_view_global;
+                rv.mesh_mode = run_mesh_vis;
+                rv.cones     = run_cone_vis ? 1 : 0;
+                vis_apply_view(vis, rv);
+            }
             std::vector<VisMesh> svm;
             for (size_t i = 0; i < scene_cfg.static_meshes.size(); ++i) {
                 const auto& sm = scene_cfg.static_meshes[i];
@@ -1690,6 +1779,7 @@ int main(int argc, char** argv)
                 vm.count      = static_vis_tris[i].size();
                 vm.color[0]   = sm.color[0]; vm.color[1] = sm.color[1]; vm.color[2] = sm.color[2];
                 vm.tri_colors = (run_mesh_vis >= 3 || sm.color_override || static_vis_colors[i].empty()) ? nullptr : static_vis_colors[i].data();
+                if (run_mesh_vis != MESH_VIS_HEAT) std::copy(sm.wire_color, sm.wire_color + 3, vm.wire_color);
                 svm.push_back(vm);
             }
             vis_set_static_meshes(vis, svm);
@@ -1702,6 +1792,7 @@ int main(int argc, char** argv)
                 vm.count      = dyn_mesh_tris[i].size();
                 vm.color[0]   = dm.color[0]; vm.color[1] = dm.color[1]; vm.color[2] = dm.color[2];
                 vm.tri_colors = (run_mesh_vis >= 3 || dm.color_override || dyn_mesh_colors[i].empty()) ? nullptr : dyn_mesh_colors[i].data();
+                if (run_mesh_vis != MESH_VIS_HEAT) std::copy(dm.wire_color, dm.wire_color + 3, vm.wire_color);
                 dvm.push_back(vm);
                 doff += dyn_mesh_tris[i].size();
             }
@@ -2348,6 +2439,9 @@ int main(int argc, char** argv)
             bool     heat_warned   = false;
             std::vector<float>    heat_colors; // 3 floats per triangle, indexed like tris
             std::vector<uint32_t> heat_prev;   // last uploaded counts: skip recolouring when unchanged
+            int         applied_mesh_mode = cfg.mesh_vis_on;  // colouring of the static meshes on the GPU
+            std::string pending_capture_name;                 // vis_shots name of the requested PNG
+            std::ofstream lidar_stats_file;
             while (running) {
                 if (cfg.visualizer_on && vis) {
                     auto now_wall = clk::now();
@@ -2366,6 +2460,23 @@ int main(int argc, char** argv)
                 if (max_record_frames > -1 && frame >= max_record_frames) {
                     fprintf(stdout, "[GRCA] Reached max_record_frames=%d. Exiting.\n", max_record_frames);
                     break;
+                }
+
+                // Scripted shots: camera + view for this frame (capture is requested in the viewer block).
+                const VisShot* cur_shot = nullptr;
+                if (cfg.visualizer_on && vis) {
+                    for (const auto& sh : vis_shots_global)
+                        if (sh.frame == frame && (sh.batch < 0 || sh.batch == (int)batchIdx)) { cur_shot = &sh; break; }
+                    if (cur_shot) {
+                        vis_apply_view(vis, cur_shot->view);
+                        for (size_t ri = 0; ri < cur_shot->robot_pos.size() && ri < cfg.robots.size(); ++ri)
+                            cfg.robots[ri].w_pose.pos = cur_shot->robot_pos[ri];  // lidar poses follow below
+                        if (cur_shot->has_pos)
+                            vis_set_camera(vis, cur_shot->pos, cur_shot->has_fwd ? cur_shot->fwd : nullptr, cam_up_global);
+                    }
+                    // The viewer's selected colouring drives the backends: rays per triangle are
+                    // counted only while the heat map is shown (V key or a shot can switch it).
+                    cfg.mesh_vis_on = vis_mesh_mode(vis);
                 }
 
                 // Pose recording (before pose updates so frame 0 reflects initial state)
@@ -2829,6 +2940,58 @@ int main(int argc, char** argv)
                 else { std::cerr << "Unknown backend: " << be << "\n"; break; }
 
                 t.ms_lidar_sim_cpu = elapsed_ms(tSim, clk::now());
+
+                // Per-lidar hit statistics (lidar_stats: true): one row per lidar per frame.
+                if (lidar_stats_global && (perf_record_frames < 0 || frame < perf_record_frames)) {
+                    if (!lidar_stats_file.is_open()) {
+                        std::string path = make_timestamped_csv_name("lidar_stats_" + be, cfg, batch_dir);
+                        lidar_stats_file.open(path);
+                        lidar_stats_file << "frame,robot,lidar,px,py,pz,rays,hits,d_min,d_p10,d_p50,d_p90,d_down,d_up,edge_frac\n";
+                        fprintf(stderr, "  Writing %s\n", path.c_str());
+                    }
+                    size_t off = 0;
+                    std::vector<float> dists;
+                    for (size_t ri = 0; ri < cfg.robots.size(); ++ri)
+                        for (size_t li = 0; li < cfg.robots[ri].lidars.size(); ++li) {
+                            const LidarCfg& lc = cfg.robots[ri].lidars[li];
+                            const size_t n = (size_t)lc.hnum * lc.vnum;
+                            if (off + n > hits.size()) break;
+                            dists.clear();
+                            size_t iDown = off, iUp = off;
+                            for (size_t k = off; k < off + n; ++k) {
+                                const GrcaHit& h = hits[k];
+                                if (h.dist > 0.f && h.dist < lc.range_max * 0.9999f) dists.push_back(h.dist);
+                                if (h.dy < hits[iDown].dy) iDown = k;
+                                if (h.dy > hits[iUp].dy)   iUp   = k;
+                            }
+                            auto q = [&](double f) -> float {
+                                if (dists.empty()) return -1.f;
+                                size_t idx = std::min(dists.size() - 1, (size_t)(f * (double)(dists.size() - 1)));
+                                std::nth_element(dists.begin(), dists.begin() + (long)idx, dists.end());
+                                return dists[idx];
+                            };
+                            auto hitDist = [&](size_t k) -> float {
+                                return (hits[k].dist > 0.f && hits[k].dist < lc.range_max * 0.9999f) ? hits[k].dist : -1.f;
+                            };
+                            const float dmin = dists.empty() ? -1.f : *std::min_element(dists.begin(), dists.end());
+                            // Scene complexity: share of neighbouring ray pairs (both hits) whose depth jumps > 10%.
+                            size_t pairs = 0, edges = 0;
+                            for (size_t k = off; k + 1 < off + n; ++k) {
+                                const float a = hits[k].dist, b = hits[k + 1].dist;
+                                if (!(a > 0.f && a < lc.range_max * 0.9999f && b > 0.f && b < lc.range_max * 0.9999f)) continue;
+                                ++pairs;
+                                if (std::fabs(a - b) > 0.1f * std::min(a, b)) ++edges;
+                            }
+                            const double edge_frac = pairs ? (double)edges / (double)pairs : 0.0;
+                            const float p10 = q(0.10), p50 = q(0.50), p90 = q(0.90);
+                            lidar_stats_file << frame << ',' << ri << ',' << li << ','
+                                << lc.w_pose.pos.x << ',' << lc.w_pose.pos.y << ',' << lc.w_pose.pos.z << ','
+                                << n << ',' << dists.size() << ',' << dmin << ',' << p10 << ',' << p50 << ',' << p90 << ','
+                                << hitDist(iDown) << ',' << hitDist(iUp) << ',' << edge_frac << '\n';
+                            off += n;
+                        }
+                }
+
                 if (t.num_bat >= 0) {
                     if (t.num_bat < bat_min) bat_min = t.num_bat;
                     if (t.num_bat > bat_max) bat_max = t.num_bat;
@@ -2893,7 +3056,36 @@ int main(int argc, char** argv)
 
                 // Visualizer update
                 if (cfg.visualizer_on && vis) {
-                    if (frame == auto_capture_global) vis_request_image(vis);  // saved below as PNG
+                    if (cur_shot) {
+                        vis_request_image(vis);                     // saved below as PNG
+                        pending_capture_name = cur_shot->name + "_f" + std::to_string(frame);
+                    } else if (frame == auto_capture_global) {
+                        vis_request_image(vis);
+                        pending_capture_name.clear();
+                    }
+                    // Colouring changed at runtime (V key or a shot): heat recolours from this
+                    // frame's counts; other modes restore the static meshes' normal colours.
+                    if (cfg.mesh_vis_on != applied_mesh_mode) {
+                        if (cfg.mesh_vis_on == MESH_VIS_HEAT) {
+                            heat_prev.clear();
+                        } else {
+                            std::vector<VisMesh> svm;
+                            for (size_t i = 0; i < static_vis_tris.size(); ++i) {
+                                const auto& sm = cfg.static_meshes[i];
+                                VisMesh vm;
+                                vm.tris       = static_vis_tris[i].data();
+                                vm.count      = static_vis_tris[i].size();
+                                vm.color[0]   = sm.color[0]; vm.color[1] = sm.color[1]; vm.color[2] = sm.color[2];
+                                vm.tri_colors = (cfg.mesh_vis_on >= 3 || sm.color_override || static_vis_colors[i].empty())
+                                              ? nullptr : static_vis_colors[i].data();
+                                std::copy(sm.wire_color, sm.wire_color + 3, vm.wire_color);
+                                svm.push_back(vm);
+                            }
+                            vis_set_static_meshes(vis, svm);
+                            if (cfg.dynamic_meshes.empty()) vis_update_dynamic_meshes(vis, {});
+                        }
+                        applied_mesh_mode = cfg.mesh_vis_on;
+                    }
                     // Heat map: recolour every triangle by the rays GRCA tested against it this frame.
                     const std::vector<uint32_t>* heat_work = nullptr;
                     if (cfg.mesh_vis_on == MESH_VIS_HEAT) {
@@ -2958,6 +3150,7 @@ int main(int argc, char** argv)
                             vm.tri_colors = heat_work ? heat_colors.data() + doff * 3
                                           : (cfg.mesh_vis_on >= 3 || dm.color_override || dyn_mesh_colors[i].empty()) ? nullptr
                                           : dyn_mesh_colors[i].data();
+                            if (!heat_work) std::copy(dm.wire_color, dm.wire_color + 3, vm.wire_color);
                             dvm.push_back(vm);
                             doff += dyn_mesh_tris[i].size();
                         }
@@ -3032,14 +3225,29 @@ int main(int argc, char** argv)
                     std::vector<unsigned char> img;
                     int iw = 0, ih = 0;
                     if (vis_take_image(vis, img, iw, ih)) {
-                        std::string png = make_timestamped_csv_name("capture_" + be, cfg, batch_dir);
+                        std::string png = make_timestamped_csv_name(
+                            pending_capture_name.empty() ? "capture_" + be : "capture_" + pending_capture_name + "_" + be,
+                            cfg, batch_dir);
                         png.replace(png.size() - 4, 4, ".png");
+                        pending_capture_name.clear();
                         if (vis_write_png(png, iw, ih, img.data())) {
                             fprintf(stderr, "  Wrote %s  (%dx%d)\n", png.c_str(), iw, ih);
+                            const std::string base = png.substr(0, png.size() - 4);
                             if (cfg.mesh_vis_on == MESH_VIS_HEAT && heat_log_max > 0.0) {
-                                const std::string base = png.substr(0, png.size() - 4);
                                 writeHeatLegend(base, heat_log_max, heat_max_rays);
                                 fprintf(stderr, "  Wrote %s_colorbar.png, %s_scale.txt\n", base.c_str(), base.c_str());
+                            }
+                            float dn = 0.f, df = 0.f; int dmap = 0;
+                            if (vis_depth_mapping(vis, dn, df, dmap)) {
+                                std::ofstream dt(base + "_depth.txt");
+                                if (dmap == 1)
+                                    dt << "hit points: grayscale linear camera depth (distance along the view direction)\n"
+                                       << "pixel value v (0..255): depth = " << dn << " + (1 - v/255) * " << (df - dn) << "\n"
+                                       << "white (255) = " << dn << " or nearer, black (0) = " << df << " or farther / background\n";
+                                else
+                                    dt << "hit points: RViz rainbow over LiDAR range\n"
+                                       << "magenta = " << dn << " or nearer ... red = " << df << " or farther\n";
+                                fprintf(stderr, "  Wrote %s_depth.txt\n", base.c_str());
                             }
                         } else {
                             fprintf(stderr, "  Failed to write %s\n", png.c_str());

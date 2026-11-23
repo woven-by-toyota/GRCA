@@ -1,0 +1,48 @@
+{
+    "skip_validation": true,
+    "skip_plot": true,
+    "benchmark_scenes": [
+        "configs/scenes/Lumberyard_all_vis.json"
+    ],
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/vis_preview_car.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/vis_16ch_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/vis_deformation_preview.json"
+    ],
+    "vis_window_size": [
+        960,
+        960
+    ],
+    "heat_max": 0,
+    "vis_shots": [
+        {
+            "robot_w_positions": [
+                [
+                    108.351,
+                    2.73,
+                    47.504
+                ]
+            ],
+            "w_cam_position": [
+                111.566,
+                5.149,
+                52.133
+            ],
+            "w_cam_forward": [
+                -0.3841,
+                -0.5121,
+                -0.7682
+            ],
+            "hit_vis_on": true,
+            "aabb_vis_on": true,
+            "cone_vis_on": true,
+            "frame": 0,
+            "name": "preview_plain",
+            "mesh_vis_on": 2
+        }
+    ]
+}

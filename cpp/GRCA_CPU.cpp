@@ -1045,6 +1045,9 @@ void run_cpu_frame(CpuState*                s,
     if (trackWork) {
         s->passedIdx.clear();
         s->triWork.assign(tris.size(), 0u);
+    } else if (!s->triWork.empty()) {
+        s->triWork.clear();   // heat map switched off: drop the stale counts
+        s->passedIdx.clear();
     }
     auto pushPassed = [&](const SavedTri& sv, size_t triIdx) {
         passedTris.push_back(sv);

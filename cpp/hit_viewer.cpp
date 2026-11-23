@@ -29,7 +29,10 @@ struct VisState : OrbitCamera {
 	bool conesVisible     = false;
 	bool hitsVisible      = true;   // H toggles
 	bool aabbsVisible     = true;   // X toggles; off by default in heat-map mode
-	bool heatMode         = false;  // mesh_vis_on == MESH_VIS_HEAT: depth-coloured hit points
+	int  depthColormap    = 0;      // heat-map hit points: 0 = RViz rainbow, 1 = grayscale (G toggles)
+	bool scripted         = false;  // vis_shots / auto_capture run: ignore keyboard/mouse (Esc still quits)
+	bool  depthShown      = false;  // last frame drew depth-coloured points
+	float depthNear = 0.f, depthFar = 0.f;  // their colour range (LiDAR range or camera depth)
 	bool imageRequested   = false;  // I pressed: grab the next rendered frame
 	bool imageReady       = false;  // pixels below hold an unclaimed capture
 	int  imageW = 0, imageH = 0;
@@ -40,7 +43,13 @@ struct VisState : OrbitCamera {
 static VulkanContext g_vk;
 
 // Heat-map mode only: hit points coloured by depth (RViz rainbow, hit_point_heat.frag).
-static VkPipeline g_heatPointPipeline = VK_NULL_HANDLE;
+static VkPipeline g_heatPointPipeline     = VK_NULL_HANDLE;
+static VkPipeline g_heatPointGrayPipeline = VK_NULL_HANDLE;  // grayscale depth (hit_point_heat_gray.frag)
+
+// Colouring currently selected (mesh_vis_on semantics, 1..4), also while meshes are hidden with M.
+static int selectedMeshMode(const VisState* vs) {
+	return vs->visMode > 0 ? vs->visMode : vs->savedVisMode;
+}
 
 // Host-visible readback buffer for PNG capture (grown on demand).
 static VkBuffer       g_capBuffer = VK_NULL_HANDLE;
@@ -259,15 +268,16 @@ VisState* vis_init(const RunConfig& cfg) {
 	vs->meshVisible = (cfg.mesh_vis_on > 0);
 	vs->dynamicVisible = (cfg.mesh_vis_on > 0);
 	vs->conesVisible = cfg.cone_vis_on;
-	vs->heatMode     = (cfg.mesh_vis_on == MESH_VIS_HEAT);
-	vs->aabbsVisible = !vs->heatMode;  // bounding boxes would clutter the heat map
-	initWindow(vs->window, "Hit Vulkan Viewer", cfg.vis_window_w, cfg.vis_window_h);
+	vs->aabbsVisible = (cfg.mesh_vis_on != MESH_VIS_HEAT);  // bounding boxes would clutter the heat map
+	vs->scripted     = cfg.vis_scripted;  // stray key presses must not change a scripted render
+	initWindow(vs->window, "Hit Vulkan Viewer", cfg.vis_window_w, cfg.vis_window_h, !cfg.vis_scripted);
 	g_vk.initialized = false;
+	g_vk.noVsync = cfg.vis_scripted;
 
 	glfwSetWindowUserPointer(vs->window, vs);
 	glfwSetCursorPosCallback(vs->window, [](GLFWwindow* win, double xpos, double ypos) {
 		VisState* s = (VisState*)glfwGetWindowUserPointer(win);
-		if (!s->mouseLocked) return;
+		if (s->scripted || !s->mouseLocked) return;
 		if (s->skipFirst) {
 			s->skipFirst = false;
 			s->lastX = float(xpos); s->lastY = float(ypos);
@@ -282,12 +292,14 @@ VisState* vis_init(const RunConfig& cfg) {
 	});
 	glfwSetScrollCallback(vs->window, [](GLFWwindow* win, double, double yoff) {
 		VisState* s = (VisState*)glfwGetWindowUserPointer(win);
+		if (s->scripted) return;
 		s->distance *= powf(1.1f, float(yoff));
 		if (s->distance < 0.1f) s->distance = 0.1f;
 	});
 	glfwSetKeyCallback(vs->window, [](GLFWwindow* win, int key, int, int action, int) {
 		if (action != GLFW_PRESS) return;
 		VisState* s = (VisState*)glfwGetWindowUserPointer(win);
+		if (s->scripted && key != GLFW_KEY_ESCAPE) return;  // scripted render: keys could move the camera
 		switch (key) {
 		case GLFW_KEY_T:
 			s->cycleLidarRequested = true;
@@ -320,6 +332,14 @@ VisState* vis_init(const RunConfig& cfg) {
 		case GLFW_KEY_O:      s->captureRequested = true; break;
 		case GLFW_KEY_H:      s->hitsVisible = !s->hitsVisible; break;
 		case GLFW_KEY_X:      s->aabbsVisible = !s->aabbsVisible; break;
+		case GLFW_KEY_G:      s->depthColormap = 1 - s->depthColormap; break;
+		case GLFW_KEY_V: {    // cycle mesh colouring: 1 wireframe, 2 solid, 3 flat colour, 4 heat map
+			const int m = selectedMeshMode(s) % 4 + 1;
+			s->visMode = s->savedVisMode = m;
+			s->meshVisible = s->dynamicVisible = true;
+			fprintf(stderr, "[vis] mesh_vis_on = %d\n", m);
+			break;
+		}
 		case GLFW_KEY_I:      s->imageRequested = true; break;
 		case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(win, GLFW_TRUE); break;
 		case GLFW_KEY_F:
@@ -357,10 +377,14 @@ VisState* vis_init(const RunConfig& cfg) {
 	auto fragCode = readFile("build/hit_point.frag.spv");
 	g_vk.graphicsPipeline = createPointCloudPipeline(
 		g_vk.device, g_vk.extent, g_vk.pipelineLayout, g_vk.renderPass, vertCode, fragCode);
-	if (vs->heatMode) {
+	{   // depth-coloured points, used whenever the heat map is selected (also via V at runtime)
 		auto heatFragCode = readFile("build/hit_point_heat.frag.spv");
 		g_heatPointPipeline = createPointCloudPipeline(
 			g_vk.device, g_vk.extent, g_vk.pipelineLayout, g_vk.renderPass, vertCode, heatFragCode);
+		auto grayFragCode = readFile("build/hit_point_heat_gray.frag.spv");
+		auto camDepthVertCode = readFile("build/hit_point_camdepth.vert.spv");  // camera depth, not LiDAR range
+		g_heatPointGrayPipeline = createPointCloudPipeline(
+			g_vk.device, g_vk.extent, g_vk.pipelineLayout, g_vk.renderPass, camDepthVertCode, grayFragCode);
 	}
 
 	// Create mesh wireframe pipeline
@@ -473,6 +497,25 @@ void vis_update(VisState* vs, const std::vector<GrcaHit>& hits, const RunConfig&
 			if (!isMiss && d > maxDist) maxDist = d;
 		}
 		if (minDist > maxDist) { minDist = 0.0f; maxDist = 1.0f; }
+		// Heat map: depth colours span the 2nd..98th percentile of hit distances, so a few
+		// far returns do not squeeze every nearby point into the first colour.
+		if (selectedMeshMode(vs) == MESH_VIS_HEAT) {
+			std::vector<float> ds;
+			const size_t step = std::max<size_t>(1, hits.size() / 65536);
+			for (size_t i = 0; i < hits.size(); i += step) {
+				const float d = hits[i].dist;
+				if (d > 0.0f && d < rangeMaxCfg * 0.9999f) ds.push_back(d);
+			}
+			if (ds.size() >= 16) {
+				auto pct = [&](double f) {
+					auto it = ds.begin() + (long)(f * (double)(ds.size() - 1));
+					std::nth_element(ds.begin(), it, ds.end());
+					return *it;
+				};
+				const float lo = pct(0.02), hi = pct(0.98);
+				if (hi > lo) { minDist = lo; maxDist = hi; }
+			}
+		}
 	}
 
 	// WASD/QE movement — active when mouse is locked (Ctrl toggles)
@@ -507,6 +550,32 @@ void vis_update(VisState* vs, const std::vector<GrcaHit>& hits, const RunConfig&
 	const float fovY = vs->lidarFollowMode ? 1.919862f : 0.785398f; // 110 deg in follow mode, 45 deg otherwise
 	makePerspective(fovY, (float)g_vk.extent.width / (float)g_vk.extent.height, 0.1f, 100000.0f, proj);
 	matMul(proj, view, mvp);
+
+	// Grayscale depth pass: colour range = 2nd..98th percentile of the points' camera depth
+	// (distance along the view direction), so the image reads as a linear depth map.
+	const bool depthPoints = (selectedMeshMode(vs) == MESH_VIS_HEAT) && vs->hitsVisible && !hits.empty();
+	if (depthPoints && vs->depthColormap == 1) {
+		std::vector<float> zs;
+		const size_t step = std::max<size_t>(1, hits.size() / 65536);
+		for (size_t i = 0; i < hits.size(); i += step) {
+			const float d = hits[i].dist;
+			if (!(d > 0.0f && d < rangeMaxCfg * 0.9999f)) continue;
+			const float z = (hits[i].hx - vs->eye[0]) * fx + (hits[i].hy - vs->eye[1]) * fy + (hits[i].hz - vs->eye[2]) * fz;
+			if (z > 0.1f) zs.push_back(z);
+		}
+		if (zs.size() >= 16) {
+			auto pct = [&](double f) {
+				auto it = zs.begin() + (long)(f * (double)(zs.size() - 1));
+				std::nth_element(zs.begin(), it, zs.end());
+				return *it;
+			};
+			const float lo = pct(0.02), hi = pct(0.98);
+			if (hi > lo) { minDist = lo; maxDist = hi; }
+		}
+	}
+	vs->depthShown = depthPoints;
+	vs->depthNear  = minDist;
+	vs->depthFar   = maxDist;
 
 	float pushData[18];
 	memcpy(pushData, mvp, 16 * sizeof(float));
@@ -606,9 +675,14 @@ void vis_update(VisState* vs, const std::vector<GrcaHit>& hits, const RunConfig&
 	}
 
 	// Draw hit points
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
-	                  (vs->heatMode && g_heatPointPipeline != VK_NULL_HANDLE) ? g_heatPointPipeline
-	                                                                          : g_vk.graphicsPipeline);
+	{
+		VkPipeline pointPipe = g_vk.graphicsPipeline;  // red points outside the heat map
+		if (selectedMeshMode(vs) == MESH_VIS_HEAT) {
+			VkPipeline depthPipe = (vs->depthColormap == 1) ? g_heatPointGrayPipeline : g_heatPointPipeline;
+			if (depthPipe != VK_NULL_HANDLE) pointPipe = depthPipe;
+		}
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pointPipe);
+	}
 	if (vs->hitsVisible && !hits.empty()) {
 		VkDeviceSize offset = 0;
 		vkCmdBindVertexBuffers(cmd, 0, 1, &g_vk.vertexBuffer, &offset);
@@ -729,6 +803,39 @@ void vis_request_image(VisState* vs) {
 	if (vs) vs->imageRequested = true;
 }
 
+bool vis_depth_mapping(const VisState* vs, float& near, float& far, int& colormap) {
+	if (!vs || !vs->depthShown) return false;
+	near = vs->depthNear; far = vs->depthFar; colormap = vs->depthColormap;
+	return true;
+}
+
+int vis_mesh_mode(const VisState* vs) {
+	return vs ? selectedMeshMode(vs) : 0;
+}
+
+void vis_apply_view(VisState* vs, const VisView& v) {
+	if (!vs) return;
+	if (v.mesh_mode > 0) {
+		vs->visMode = vs->savedVisMode = v.mesh_mode;
+		vs->meshVisible = vs->dynamicVisible = true;
+	} else if (v.mesh_mode == 0) {
+		vs->meshVisible = vs->dynamicVisible = false;
+	}
+	if (v.static_meshes  >= 0) vs->meshVisible    = (v.static_meshes  != 0);
+	if (v.dynamic_meshes >= 0) vs->dynamicVisible = (v.dynamic_meshes != 0);
+	// Same rule as the M/B keys: visMode 0 <=> no mesh shown; colouring kept in savedVisMode.
+	if (!vs->meshVisible && !vs->dynamicVisible) {
+		if (vs->visMode > 0) vs->savedVisMode = vs->visMode;
+		vs->visMode = 0;
+	} else if (vs->visMode == 0) {
+		vs->visMode = std::max(1, vs->savedVisMode);
+	}
+	if (v.hits  >= 0) vs->hitsVisible  = (v.hits  != 0);
+	if (v.aabbs >= 0) vs->aabbsVisible = (v.aabbs != 0);
+	if (v.cones >= 0) vs->conesVisible = (v.cones != 0);
+	if (v.depth_colormap >= 0) vs->depthColormap = v.depth_colormap;
+}
+
 bool vis_take_image(VisState* vs, std::vector<unsigned char>& rgb, int& w, int& h) {
 	if (!vs || !vs->imageReady) return false;
 	vs->imageReady = false;
@@ -832,7 +939,10 @@ static void uploadMeshVertices(float*& wireDst, float*& solidDst, const VisMesh&
 		} else {
 			r = m.color[0]; g = m.color[1]; b = m.color[2];
 		}
-		const float wr = r*0.3f, wg = g*0.3f, wb = b*0.3f;
+		const bool  wireSet = (m.wire_color[0] >= 0.f);   // per-mesh edge colour (e.g. white on black)
+		const float wr = wireSet ? m.wire_color[0] : r*0.3f;
+		const float wg = wireSet ? m.wire_color[1] : g*0.3f;
+		const float wb = wireSet ? m.wire_color[2] : b*0.3f;
 		const auto& tri = m.tris[t];
 		solidDst[ 0]=tri.v[0][0]; solidDst[ 1]=tri.v[0][1]; solidDst[ 2]=tri.v[0][2]; solidDst[ 3]=r;  solidDst[ 4]=g;  solidDst[ 5]=b;
 		solidDst[ 6]=tri.v[1][0]; solidDst[ 7]=tri.v[1][1]; solidDst[ 8]=tri.v[1][2]; solidDst[ 9]=r;  solidDst[10]=g;  solidDst[11]=b;
@@ -1008,11 +1118,23 @@ void vis_set_lidars(VisState* vs, const std::vector<VisLidar>& lidars) {
 	if (!g_vk.initialized) return;
 	const int SEGS = 16;
 	const size_t vertsPerLidar = (size_t)SEGS * 4 * 3; // 4 tris per seg, 3 verts each
-	const size_t totalVerts = lidars.size() * vertsPerLidar;
+	// x2: every triangle is also emitted with reversed winding (double-sided), so the solid
+	// pipeline's back-face culling never hides part of the cylinder.
+	const size_t totalVerts = lidars.size() * vertsPerLidar * 2;
 	if (totalVerts == 0) { g_vk.lidarSolidVertexCount = 0; return; }
 	ensureLidarSolidBuffer(totalVerts);
 	float* dst = (float*)g_vk.mappedLidarSolidData;
-	for (const auto& L : lidars) uploadCylinder(dst, L);
+	for (const auto& L : lidars) {
+		const float* front = dst;
+		uploadCylinder(dst, L);
+		for (size_t t = 0; t < vertsPerLidar / 3; ++t) {   // back faces: vertex order 0, 2, 1
+			const float* tri = front + t * 18;               // 3 verts x (pos + colour)
+			memcpy(dst,      tri,      6 * sizeof(float));
+			memcpy(dst + 6,  tri + 12, 6 * sizeof(float));
+			memcpy(dst + 12, tri + 6,  6 * sizeof(float));
+			dst += 18;
+		}
+	}
 	g_vk.lidarSolidVertexCount = (uint32_t)totalVerts;
 }
 
@@ -1155,6 +1277,10 @@ void vis_destroy(VisState* vs) {
 	if (g_heatPointPipeline != VK_NULL_HANDLE) {
 		vkDestroyPipeline(g_vk.device, g_heatPointPipeline, nullptr);
 		g_heatPointPipeline = VK_NULL_HANDLE;
+	}
+	if (g_heatPointGrayPipeline != VK_NULL_HANDLE) {
+		vkDestroyPipeline(g_vk.device, g_heatPointGrayPipeline, nullptr);
+		g_heatPointGrayPipeline = VK_NULL_HANDLE;
 	}
 	vkDestroyPipelineLayout(g_vk.device, g_vk.pipelineLayout, nullptr);
 	destroyVulkanContext(g_vk);
