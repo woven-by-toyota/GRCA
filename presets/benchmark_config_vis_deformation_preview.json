@@ -28,20 +28,20 @@
                 ]
             ],
             "w_cam_position": [
-                111.566,
-                5.149,
-                52.133
+                112.212,
+                5.354,
+                52.194
             ],
             "w_cam_forward": [
-                -0.3841,
-                -0.5121,
-                -0.7682
+                -0.3762,
+                -0.5407,
+                -0.7524
             ],
             "hit_vis_on": true,
             "aabb_vis_on": true,
             "cone_vis_on": true,
             "frame": 0,
-            "name": "preview_plain",
+            "name": "test_setup",
             "mesh_vis_on": 2
         }
     ]

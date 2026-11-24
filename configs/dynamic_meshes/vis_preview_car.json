@@ -3,9 +3,14 @@
         "file": "mesh/sportsCar/sportsCar.obj",
         "scale": 1,
         "w_position": [
-            109.851,
+            110.567,
             0.48,
-            46.504
+            46.146
+        ],
+        "w_forward": [
+            0.05234,
+            0.0,
+            0.99863
         ],
         "color": [
             0.0,
