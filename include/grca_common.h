@@ -32,6 +32,7 @@ struct StaticMesh {
     float scale = 1.0f;
     float color[3] = {0.7f, 0.7f, 0.7f}; // RGB, default gray
     bool color_override = false; // if true, color replaces per-triangle MTL colors
+    float wire_color[3] = {-1.f, -1.f, -1.f}; // viewer edge colour; negative = 30% of the fill colour
 };
 
 // =============================================================================
@@ -44,6 +45,7 @@ struct DynamicMesh {
     float scale = 1.0f;
     float color[3] = {0.7f, 0.7f, 0.7f}; // RGB, default gray
     bool color_override = false; // if true, color replaces per-triangle MTL colors
+    float wire_color[3] = {-1.f, -1.f, -1.f}; // viewer edge colour; negative = 30% of the fill colour
 };
 
 // =============================================================================
@@ -75,6 +77,9 @@ struct RobotCfg {
 //   MAX_LIDAR_COUNT     =  4  lidars per robot
 //   MAX_LIDAR_RAY_COUNT = 524288  rays per robot (shared across all its lidars)
 // =============================================================================
+// mesh_vis_on value for the per-triangle heat map (rays tested per triangle).
+constexpr int MESH_VIS_HEAT = 4;
+
 struct RunConfig {
     std::string output;                 // CSV prefix; files written as <output>_rR_lL.csv
     std::string backend = "grca-cpu";
@@ -117,8 +122,12 @@ struct RunConfig {
 
     // Visualizer (viewer) control
     bool visualizer_on  = false;          // true = open viewer window
-    int  mesh_vis_on    = 0;              // 0 = off, 1 = wireframe, 2 = solid + wireframe
+    int  mesh_vis_on    = 0;              // 0 = off, 1 = wireframe, 2 = solid + wireframe, 3 = flat JSON color,
+                                          // 4 = heat map of rays tested per triangle (grca-cpu / grca-cuda)
     bool cone_vis_on    = false;          // true = render lidar channel cones
+    int  vis_window_w   = 1000;           // viewer window size in pixels (PNG captures use it)
+    int  vis_window_h   = 1000;
+    bool vis_scripted   = false;          // vis_shots / auto_capture_frame run: unfocused window, no vsync wait
 };
 
 // =============================================================================

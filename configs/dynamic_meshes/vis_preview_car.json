@@ -1,0 +1,16 @@
+[
+    {
+        "file": "mesh/sportsCar/sportsCar.obj",
+        "scale": 1,
+        "w_position": [
+            109.851,
+            0.48,
+            46.504
+        ],
+        "color": [
+            0.0,
+            1.0,
+            0.0
+        ]
+    }
+]

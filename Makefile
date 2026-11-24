@@ -22,7 +22,7 @@ else
     Install with: sudo apt install glslang-tools)
 endif
 
-SHADER_SRCS := cpp/hit_point.vert cpp/hit_point.frag \
+SHADER_SRCS := cpp/hit_point.vert cpp/hit_point_camdepth.vert cpp/hit_point.frag cpp/hit_point_heat.frag cpp/hit_point_heat_gray.frag \
 			   cpp/mesh_wire.vert cpp/mesh_wire.frag \
 			   cpp/cone.frag
 SHADER_SPVS := $(patsubst cpp/%.vert,build/%.vert.spv,$(filter %.vert,$(SHADER_SRCS))) \

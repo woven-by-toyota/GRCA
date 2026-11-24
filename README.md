@@ -204,6 +204,13 @@ cp presets/benchmark_config_3080ti_main_suite.json benchmark_config.json
 
 `benchmark_config_3080ti_compact_cost.json` (the `_compact` main-suite tests; Power Plant, 30 dyn, Ω = 8) is included for completeness but is not reported in the paper.
 
+`benchmark_config_static_heat_map.json` is not a benchmark: it opens the Hit Viewer in heat-map mode (`mesh_vis_on: 4`, `configs/tests/static_visual_heat.json`) on a static Power Plant scene with GRCA-CUDA, colouring every triangle by the rays GRCA tested against it (gray = culled). It runs until the window is closed; press `I` to save the view as a PNG together with its colour bar and scale. The window is 1220 × 1000 (`vis_window_size`); camera, LiDAR and scene are set as in any other config (see [Visualizer fields](docs/configuration.md) and [Tools](docs/tools.md)).
+
+The `benchmark_config_vis_*.json` presets render figures with scripted shots (`vis_shots`) and quit on their own; images go to the run's batch folder:
+- `benchmark_config_vis_teaser_<Scene>.json` (one per main-suite scene): one LiDAR in a cluttered spot, four images from the same camera — plain scene, heat map, rainbow depth points, grayscale depth points. The LiDAR range is chosen per spot for the clearest image (`configs/robots/vis_teaser_robot*.json`): 200 m for Rungholt and Vokselia, 50 m for Emerald Square, 15 m for Bistro and Power Plant, 10 m for San Miguel.
+- `benchmark_config_vis_deformation_modes.json`: the ND / OBD / SWD run conditions (batches 0–2, `configs/tests/vis_deformation_modes.json`) with one sports car (`1_dyn_mesh.json`) and the 128-channel LiDAR (`max_rays_1_robot.json`) in the empty 10 × 10 × 10 world. The random dynamic test (seed 42) gives the car and the LiDAR a new random position and orientation every frame; per-triangle scale is 0.25–1.5 for legibility. The three shots auto-capture ND at frame 1270, OBD at frame 175 and SWD at frame 269, each viewed head-on; the frame number is part of every image name (`capture_<name>_f<frame>_…png`).
+- `benchmark_config_vis_deformation_preview.json`: the overview image — the 16-channel LiDAR with its cones and the sports car parked next to it on a Bistro street, drawn with `configs/scenes/Lumberyard_all_vis.json` (black faces, white triangle edges via `wire_color`).
+
 Notes on what the presets run:
 - "hybrid" in `best_hybrid*` and `configs/tests/3080ti mobile/fast_hybrid_find/` refers to the periodic-rebuild (`prN`) sweep, not the hybrid backends.
 - `best_hybrid_chaos` runs OptiX only, for 10 frames (`bvh_sweep_*_chaos.json`); `best_hybrid` runs OptiX and Embree for 50 frames.

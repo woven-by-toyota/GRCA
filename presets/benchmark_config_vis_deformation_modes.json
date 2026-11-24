@@ -1,0 +1,87 @@
+{
+    "skip_validation": true,
+    "skip_plot": true,
+    "benchmark_dynamic_meshes": [
+        "configs/dynamic_meshes/1_dyn_mesh.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/max_rays_1_robot.json"
+    ],
+    "active_tests": [
+        "configs/tests/vis_deformation_modes.json"
+    ],
+    "vis_window_size": [
+        960,
+        960
+    ],
+    "heat_max": 0,
+    "w_cam_position": [
+        -17.37,
+        0.0,
+        0.0
+    ],
+    "w_cam_forward": [
+        1.0,
+        0.0,
+        0.0
+    ],
+    "vis_shots": [
+        {
+            "frame": 1270,
+            "batch": 0,
+            "name": "ND",
+            "w_cam_position": [
+                -17.37,
+                0.0,
+                0.0
+            ],
+            "w_cam_forward": [
+                1.0,
+                0.0,
+                0.0
+            ],
+            "mesh_vis_on": 2,
+            "hit_vis_on": true,
+            "aabb_vis_on": true,
+            "cone_vis_on": true
+        },
+        {
+            "frame": 175,
+            "batch": 1,
+            "name": "OBD",
+            "w_cam_position": [
+                0.0,
+                0.0,
+                -17.37
+            ],
+            "w_cam_forward": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "mesh_vis_on": 2,
+            "hit_vis_on": true,
+            "aabb_vis_on": true,
+            "cone_vis_on": true
+        },
+        {
+            "frame": 269,
+            "batch": 2,
+            "name": "SWD",
+            "w_cam_position": [
+                0.0,
+                0.0,
+                -19.64
+            ],
+            "w_cam_forward": [
+                0.0,
+                0.0,
+                1.0
+            ],
+            "mesh_vis_on": 2,
+            "hit_vis_on": true,
+            "aabb_vis_on": true,
+            "cone_vis_on": true
+        }
+    ]
+}

@@ -1,5 +1,6 @@
 #pragma once
 #include "../include/grca_common.h"
+#include <cstdint>
 
 // Opaque persistent CUDA state. Full definition lives in GRCA_CUDA.cu.
 struct CudaState;
@@ -22,6 +23,11 @@ void run_cuda_frame(CudaState*               state,
                     const std::vector<Tri3>& tris,
                     std::vector<GrcaHit>&     hits,
                     FrameTimings&              t);
+
+// Rays tested per triangle in the last frame, indexed like the tris passed to
+// run_cuda_frame.  Filled only in heat-map mode (mesh_vis_on == MESH_VIS_HEAT);
+// empty otherwise.  0 = culled (never tested against any ray).
+const std::vector<uint32_t>& cuda_tri_work(const CudaState* state);
 
 // Release all CUDA resources owned by state.
 void destroy_cuda(CudaState* state);

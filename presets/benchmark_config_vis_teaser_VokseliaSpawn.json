@@ -1,0 +1,126 @@
+{
+    "skip_validation": true,
+    "skip_plot": true,
+    "benchmark_scenes": [
+        "configs/scenes/VokseliaSpawn.json"
+    ],
+    "benchmark_robots": [
+        "configs/robots/vis_teaser_robot_200m.json"
+    ],
+    "active_tests": [
+        "configs/tests/vis_teaser.json"
+    ],
+    "vis_window_size": [
+        1200,
+        900
+    ],
+    "heat_max": 0,
+    "vis_shots": [
+        {
+            "frame": 0,
+            "name": "1_plain",
+            "robot_w_positions": [
+                [
+                    -9.324,
+                    24.284,
+                    -52.743
+                ]
+            ],
+            "w_cam_position": [
+                -24.184,
+                34.791,
+                -67.603
+            ],
+            "w_cam_forward": [
+                0.6264,
+                -0.464,
+                0.6264
+            ],
+            "aabb_vis_on": false,
+            "cone_vis_on": false,
+            "mesh_vis_on": 2,
+            "hit_vis_on": false
+        },
+        {
+            "frame": 1,
+            "name": "2_heat",
+            "robot_w_positions": [
+                [
+                    -9.324,
+                    24.284,
+                    -52.743
+                ]
+            ],
+            "w_cam_position": [
+                -24.184,
+                34.791,
+                -67.603
+            ],
+            "w_cam_forward": [
+                0.6264,
+                -0.464,
+                0.6264
+            ],
+            "aabb_vis_on": false,
+            "cone_vis_on": false,
+            "mesh_vis_on": 4,
+            "hit_vis_on": false
+        },
+        {
+            "frame": 2,
+            "name": "3_rainbow",
+            "robot_w_positions": [
+                [
+                    -9.324,
+                    24.284,
+                    -52.743
+                ]
+            ],
+            "w_cam_position": [
+                -24.184,
+                34.791,
+                -67.603
+            ],
+            "w_cam_forward": [
+                0.6264,
+                -0.464,
+                0.6264
+            ],
+            "aabb_vis_on": false,
+            "cone_vis_on": false,
+            "mesh_vis_on": 4,
+            "static_mesh_vis_on": false,
+            "dynamic_mesh_vis_on": false,
+            "hit_vis_on": true,
+            "hit_depth_colormap": "rainbow"
+        },
+        {
+            "frame": 3,
+            "name": "4_gray",
+            "robot_w_positions": [
+                [
+                    -9.324,
+                    24.284,
+                    -52.743
+                ]
+            ],
+            "w_cam_position": [
+                -24.184,
+                34.791,
+                -67.603
+            ],
+            "w_cam_forward": [
+                0.6264,
+                -0.464,
+                0.6264
+            ],
+            "aabb_vis_on": false,
+            "cone_vis_on": false,
+            "mesh_vis_on": 4,
+            "static_mesh_vis_on": false,
+            "dynamic_mesh_vis_on": false,
+            "hit_vis_on": true,
+            "hit_depth_colormap": "gray"
+        }
+    ]
+}

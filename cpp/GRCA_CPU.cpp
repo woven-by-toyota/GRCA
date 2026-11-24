@@ -1039,6 +1039,21 @@ void run_cpu_frame(CpuState*                s,
     passedTris.clear();
     passedTris.reserve(r.bat_capacity);
 
+    // Heat-map mode: also record each passed triangle's index so the core loop can
+    // attribute its rays tested back to the input triangle.
+    const bool trackWork = r.visualizer_on && r.mesh_vis_on == MESH_VIS_HEAT;
+    if (trackWork) {
+        s->passedIdx.clear();
+        s->triWork.assign(tris.size(), 0u);
+    } else if (!s->triWork.empty()) {
+        s->triWork.clear();   // heat map switched off: drop the stale counts
+        s->passedIdx.clear();
+    }
+    auto pushPassed = [&](const SavedTri& sv, size_t triIdx) {
+        passedTris.push_back(sv);
+        if (trackWork) s->passedIdx.push_back((uint32_t)triIdx);
+    };
+
     // Early T filter — fused with passedTris packing, dispatched by s->packet_size.
     // Geometry (BuildTriangle) is computed once per SIMD batch; the two old separate
     // passes (filter + pack) are merged to avoid the intermediate trilidarMasks vector.
@@ -1092,12 +1107,12 @@ void run_cpu_frame(CpuState*                s,
                 for (int i = 0; i < 8; ++i) if (maskA[i]) {
                     SavedTri sv; sv.v[0]={tmpA[0][i],tmpA[1][i],tmpA[2][i]};
                     sv.v[1]={tmpA[3][i],tmpA[4][i],tmpA[5][i]}; sv.v[2]={tmpA[6][i],tmpA[7][i],tmpA[8][i]};
-                    sv.lidarMask=maskA[i]; passedTris.push_back(sv);
+                    sv.lidarMask=maskA[i]; pushPassed(sv, base + i);
                 }
                 for (int i = 0; i < 8; ++i) if (maskB[i]) {
                     SavedTri sv; sv.v[0]={tmpB[0][i],tmpB[1][i],tmpB[2][i]};
                     sv.v[1]={tmpB[3][i],tmpB[4][i],tmpB[5][i]}; sv.v[2]={tmpB[6][i],tmpB[7][i],tmpB[8][i]};
-                    sv.lidarMask=maskB[i]; passedTris.push_back(sv);
+                    sv.lidarMask=maskB[i]; pushPassed(sv, base + 8 + i);
                 }
             }
             // Tail: up to 15 remaining triangles processed 8-at-a-time.
@@ -1115,7 +1130,7 @@ void run_cpu_frame(CpuState*                s,
                 for (int i = 0; i < count; ++i) if (masks[i]) {
                     SavedTri sv; sv.v[0]={tmpA[0][i],tmpA[1][i],tmpA[2][i]};
                     sv.v[1]={tmpA[3][i],tmpA[4][i],tmpA[5][i]}; sv.v[2]={tmpA[6][i],tmpA[7][i],tmpA[8][i]};
-                    sv.lidarMask=masks[i]; passedTris.push_back(sv);
+                    sv.lidarMask=masks[i]; pushPassed(sv, base + i);
                 }
             }
         }
@@ -1144,7 +1159,7 @@ void run_cpu_frame(CpuState*                s,
                 for (int i = 0; i < count; ++i) if (masks[i]) {
                     SavedTri sv; sv.v[0]={tmp[0][i],tmp[1][i],tmp[2][i]};
                     sv.v[1]={tmp[3][i],tmp[4][i],tmp[5][i]}; sv.v[2]={tmp[6][i],tmp[7][i],tmp[8][i]};
-                    sv.lidarMask=masks[i]; passedTris.push_back(sv);
+                    sv.lidarMask=masks[i]; pushPassed(sv, base + i);
                 }
             }
         }
@@ -1176,7 +1191,7 @@ void run_cpu_frame(CpuState*                s,
                 for (int i = 0; i < count; ++i) if (masks[i]) {
                     SavedTri sv; sv.v[0]={tmp[0][i],tmp[1][i],tmp[2][i]};
                     sv.v[1]={tmp[3][i],tmp[4][i],tmp[5][i]}; sv.v[2]={tmp[6][i],tmp[7][i],tmp[8][i]};
-                    sv.lidarMask=masks[i]; passedTris.push_back(sv);
+                    sv.lidarMask=masks[i]; pushPassed(sv, base + i);
                 }
             }
         }
@@ -1184,7 +1199,8 @@ void run_cpu_frame(CpuState*                s,
 #endif // __SSE4_1__
         // ---- Scalar fallback (packet_size == 1) ----------------------------------------
         {
-            for (const auto& raw : tris) {
+            for (size_t ti = 0; ti < tris.size(); ++ti) {
+                const Tri3& raw = tris[ti];
                 float3 v0 = {raw.v[0][0], raw.v[0][1], raw.v[0][2]};
                 float3 v1 = {raw.v[1][0], raw.v[1][1], raw.v[1][2]};
                 float3 v2 = {raw.v[2][0], raw.v[2][1], raw.v[2][2]};
@@ -1195,7 +1211,7 @@ void run_cpu_frame(CpuState*                s,
                         mask |= (1u << li);
                 if (mask) {
                     SavedTri sv; sv.v[0]=v0; sv.v[1]=v1; sv.v[2]=v2; sv.lidarMask=mask;
-                    passedTris.push_back(sv);
+                    pushPassed(sv, ti);
                 }
             }
         }
@@ -1207,7 +1223,8 @@ void run_cpu_frame(CpuState*                s,
     for (size_t li = 0; li < nLidars; ++li) {
         GrcaLidar& L  = s->lidars[li];
         uint32_t bit = 1u << li;
-        for (const auto& sv : passedTris) {
+        for (size_t k = 0; k < passedTris.size(); ++k) {
+            const SavedTri& sv = passedTris[k];
             if (!(sv.lidarMask & bit)) continue;
             RawTri tri = {sv.v[0], sv.v[1], sv.v[2]};
             // Compute normal first for cheap range check before the full FillGrcaTriData.
@@ -1240,7 +1257,9 @@ void run_cpu_frame(CpuState*                s,
                       && (g.toChannelId - g.fromChannelId) < (uint32_t)r.cpu_sat_max_channel_diff
                       && g.estimSweepDiff                  < (uint32_t)r.cpu_sat_max_sweep_diff;
             if (!isSAT) ++bat_count;
+            const int rticBefore = rtic_count;
             GRCA_SAT_BAT(L, tri, edges_normal, g, L.hitPoints.data(), s->packet_size, r.cpu_sat_max_channel_diff, r.cpu_sat_max_sweep_diff, rtic_count);
+            if (trackWork) s->triWork[s->passedIdx[k]] += (uint32_t)(rtic_count - rticBefore);
         }
     }
     t.num_bat          = bat_count;
@@ -1252,5 +1271,7 @@ void run_cpu_frame(CpuState*                s,
 
     cpu_fill_hits(*s, r, hits, t);
 }
+
+const std::vector<uint32_t>& cpu_tri_work(const CpuState* s) { return s->triWork; }
 
 void destroy_cpu(CpuState* s) { delete s; }

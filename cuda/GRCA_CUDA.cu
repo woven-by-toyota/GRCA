@@ -809,6 +809,7 @@ __global__ void SetupLidarRays(RayData* rayDataBuf, const RayOriginData* rayOrig
 //   triRayCastBuf — BAT triangle list fed into GRCA_Late_Pass
 //   uniformBuf    — updated dispatch args / bounds
 // ===========================================================================
+template <bool kTrackWork>  // true only in heat-map mode: accumulate rays tested per triangle
 __global__ void GRCA_Early_Pass(
     const unsigned char* vertexBuf,
     const unsigned int*  indexBuf,
@@ -821,7 +822,8 @@ __global__ void GRCA_Early_Pass(
     unsigned int         triCount,
     unsigned int         maxSweepCount,
     unsigned int         maxChannelCount,
-    unsigned int*        d_debug)        // [0]=earlyFilterTCount [1]=rticCount; null when !debug
+    unsigned int*        d_debug,        // [0]=earlyFilterTCount [1]=rticCount; null when !debug
+    unsigned int*        d_triWork)      // [triIndex] = rays tested; used only when kTrackWork
 {
     __shared__ RayOriginCache rayOriginCache[MAX_ROBOT_LIDAR_COUNT];
     __shared__ TriTemp        triTempCache[512];
@@ -1033,6 +1035,9 @@ __global__ void GRCA_Early_Pass(
                 if (d_debug)
                     atomicAdd(&d_debug[1],
                               (toChannelId - fromChannelId + 1u) * (estimSweepDiff + 1u));
+                if (kTrackWork)
+                    atomicAdd(&d_triWork[triIndex],
+                              (toChannelId - fromChannelId + 1u) * (estimSweepDiff + 1u));
                 unsigned int globalRayIdBase = robotId * MAX_LIDAR_RAY_COUNT;
                 for (unsigned int chId = fromChannelId; chId <= toChannelId; ++chId) {
                     unsigned int rayRowOff = globalRayIdBase + oc.localRayIdOffset +
@@ -1101,6 +1106,7 @@ __global__ void GRCA_Early_Pass(
 //   1. Precompute GACP cone-intersection data per channel in thread-row 0
 //   2. All 32 threads in y process their sweep slice and run RTI
 // ===========================================================================
+template <bool kTrackWork>  // true only in heat-map mode: accumulate rays tested per triangle
 __global__ void GRCA_Late_Pass(
     RayCastOutput*       rayCastOutputBuf,
     RayData*             rayDataBuf,
@@ -1110,7 +1116,8 @@ __global__ void GRCA_Late_Pass(
     const unsigned char* vertexBuf,
     const unsigned int*  indexBuf,
     unsigned int         robotCount,
-    unsigned int*        d_debug)
+    unsigned int*        d_debug,
+    unsigned int*        d_triWork)      // [triIndex] = rays tested; used only when kTrackWork
 {
     __shared__ TriRayLimit    trlShBuf[PER_THREAD_RAY_BATCH * 32];
     __shared__ RayCastDataSh  rcShBuf[32];
@@ -1303,6 +1310,7 @@ __global__ void GRCA_Late_Pass(
     // --- All 32x32 threads: run Moller-Trumbore RTI over assigned sweep/channel slices ---
     // unsigned int reflectiveObjType = rcShBuf[shId].reflectiveObjType; // unused
     unsigned int channelIdOffset   = 0;
+    unsigned int myRtic            = 0;  // rays this thread tested (kTrackWork only)
 
     for (channelIdOffset = 0; channelIdOffset < PER_THREAD_RAY_BATCH; ++channelIdOffset) {
         unsigned int trlShId  = channelIdOffset * 32u + shId;  // transposed for coalesced access
@@ -1332,12 +1340,16 @@ __global__ void GRCA_Late_Pass(
                 rayDataBuf[globalRayId].direction, rcShBuf[shId].pos,
                 rcShBuf[shId].triVerts[0], rcShBuf[shId].edge1, rcShBuf[shId].edge2);
             if (d_debug) atomicAdd(&d_debug[1], 1u);
+            if (kTrackWork) ++myRtic;
             if (dist >= FLT_MAX_VAL) continue;
 
             unsigned int newDist  = asUINT_sortable(dist);
             unsigned int prevDist = atomicMin(&rayDataBuf[globalRayId].rangeAsUint, newDist);
         }
     }
+    // One atomic per thread rather than per ray: big BAT triangles span many rays.
+    if (kTrackWork && myRtic)
+        atomicAdd(&d_triWork[triBuf[blockIdx.x * 32u + shId].triIndex], myRtic);
 }
 
 // ===========================================================================
@@ -1376,15 +1388,21 @@ __global__ void DispatchLatePass(
     const unsigned char* vertexBuf,
     const unsigned int*  indexBuf,
     unsigned int         robotCount,
-    unsigned int*        d_debug)
+    unsigned int*        d_debug,
+    unsigned int*        d_triWork)      // non-null only in heat-map mode
 {
     unsigned int X = uniformBuf->rayCastDispatchGroupX;
     unsigned int Y = uniformBuf->rayCastDispatchGroupY;
     unsigned int Z = uniformBuf->rayCastDispatchGroupZ;
     if (X == 0u || Y == 0u || Z == 0u) return;
-    GRCA_Late_Pass<<<dim3(X, Y, Z), dim3(32, 32, 1)>>>(
-        rayCastOutputBuf, rayDataBuf, uniformBuf,
-        rayOriginBuf, triBuf, vertexBuf, indexBuf, robotCount, d_debug);
+    if (d_triWork)
+        GRCA_Late_Pass<true><<<dim3(X, Y, Z), dim3(32, 32, 1)>>>(
+            rayCastOutputBuf, rayDataBuf, uniformBuf,
+            rayOriginBuf, triBuf, vertexBuf, indexBuf, robotCount, d_debug, d_triWork);
+    else
+        GRCA_Late_Pass<false><<<dim3(X, Y, Z), dim3(32, 32, 1)>>>(
+            rayCastOutputBuf, rayDataBuf, uniformBuf,
+            rayOriginBuf, triBuf, vertexBuf, indexBuf, robotCount, d_debug, nullptr);
 }
 
 // ===========================================================================
@@ -1405,16 +1423,23 @@ void launchGRCA_EarlyPass(
     TriRay* d_triRayCast, UniformData* d_uniform,
     unsigned int triCount, unsigned int robotCount, unsigned int maxLidarCount,
     unsigned int maxSweepCount, unsigned int maxChannelCount,
-    unsigned int* d_debug, cudaStream_t stream = 0)
+    unsigned int* d_debug, unsigned int* d_triWork, cudaStream_t stream = 0)
 {
     unsigned int groups = (triCount + 511u) / 512u;
     dim3 block(32, 16);
     dim3 grid(groups);
-    GRCA_Early_Pass<<<grid, block, 0, stream>>>(
-        d_vertexBuf, d_indexBuf, d_rayOrigins, d_rays,
-        d_triRayCast, d_uniform,
-        robotCount, maxLidarCount, triCount,
-        maxSweepCount, maxChannelCount, d_debug);
+    if (d_triWork)
+        GRCA_Early_Pass<true><<<grid, block, 0, stream>>>(
+            d_vertexBuf, d_indexBuf, d_rayOrigins, d_rays,
+            d_triRayCast, d_uniform,
+            robotCount, maxLidarCount, triCount,
+            maxSweepCount, maxChannelCount, d_debug, d_triWork);
+    else
+        GRCA_Early_Pass<false><<<grid, block, 0, stream>>>(
+            d_vertexBuf, d_indexBuf, d_rayOrigins, d_rays,
+            d_triRayCast, d_uniform,
+            robotCount, maxLidarCount, triCount,
+            maxSweepCount, maxChannelCount, d_debug, nullptr);
 }
 
 void launchGRCA_LatePass(
@@ -1424,13 +1449,18 @@ void launchGRCA_LatePass(
     const unsigned char* d_vertexBuf, const unsigned int* d_indexBuf,
     unsigned int  rayCastDispatchGroupX, unsigned int rayCastDispatchGroupY,
     unsigned int  rayCastDispatchGroupZ, unsigned int robotCount,
-    unsigned int* d_debug, cudaStream_t stream = 0)
+    unsigned int* d_debug, unsigned int* d_triWork, cudaStream_t stream = 0)
 {
     dim3 block(32, 32);
     dim3 grid(rayCastDispatchGroupX, rayCastDispatchGroupY, rayCastDispatchGroupZ);
-    GRCA_Late_Pass<<<grid, block, 0, stream>>>(
-        d_output, d_rays, d_uniform, d_rayOrigins,
-        d_triRayCast, d_vertexBuf, d_indexBuf, robotCount, d_debug);
+    if (d_triWork)
+        GRCA_Late_Pass<true><<<grid, block, 0, stream>>>(
+            d_output, d_rays, d_uniform, d_rayOrigins,
+            d_triRayCast, d_vertexBuf, d_indexBuf, robotCount, d_debug, d_triWork);
+    else
+        GRCA_Late_Pass<false><<<grid, block, 0, stream>>>(
+            d_output, d_rays, d_uniform, d_rayOrigins,
+            d_triRayCast, d_vertexBuf, d_indexBuf, robotCount, d_debug, nullptr);
 }
 
 void launchRayCastOutputAsFloat(RayCastOutput* d_output, const RayData* d_rays, const RayOriginData* d_rayOrigins,
@@ -1525,6 +1555,11 @@ struct CudaState {
 
     bool           debug   = false;
     unsigned int*  d_debug = nullptr;  // [0]=earlyFilterTCount [1]=rticCount; null when !debug
+
+    // Heat map (mesh_vis_on == MESH_VIS_HEAT): rays tested per triangle.  Allocated whenever
+    // the viewer is open so the mode can be switched at runtime; filled only in heat-map frames.
+    unsigned int*         d_triWork = nullptr;  // N_TRIS counters on the GPU; null without viewer
+    std::vector<uint32_t> h_triWork;            // last heat-map frame's counts, indexed like tris; empty otherwise
 };
 
 // ---------------------------------------------------------------------------
@@ -1684,6 +1719,8 @@ CudaState* init_cuda(const RunConfig& r,
     CHECK_CUDA(cudaMalloc(&s->d_index,  s->N_TRIS * 3u               * sizeof(unsigned int)));
     if (s->debug)
         CHECK_CUDA(cudaMalloc(&s->d_debug, 2 * sizeof(unsigned int)));
+    if (r.visualizer_on && s->N_TRIS > 0)
+        CHECK_CUDA(cudaMalloc(&s->d_triWork, s->N_TRIS * sizeof(unsigned int)));
 
     auto tInit1 = std::chrono::steady_clock::now();
     t.ms_init_cpu = std::chrono::duration<double,std::milli>(tInit1 - tInit0).count();
@@ -1776,13 +1813,18 @@ void run_cuda_frame(CudaState*               s,
     }
     if (s->d_debug)
         CHECK_CUDA(cudaMemsetAsync(s->d_debug, 0, 2 * sizeof(unsigned int), s->stream));
+    // Count rays per triangle only while the heat map is shown (benchmark kernels otherwise).
+    unsigned int* d_triWork = (s->d_triWork && r.mesh_vis_on == MESH_VIS_HEAT) ? s->d_triWork : nullptr;
+    if (d_triWork)
+        CHECK_CUDA(cudaMemsetAsync(d_triWork, 0, s->N_TRIS * sizeof(unsigned int), s->stream));
     launchGRCA_EarlyPass(s->d_verts, s->d_index, s->d_rod, s->d_rays,
                         s->d_triRay, s->d_unif, (unsigned int)s->N_TRIS,
                         s->ROBOT_COUNT, s->LIDAR_COUNT,
                         s->maxPreprocessSweepCount, s->maxPreprocessChannelCount,
-                        s->d_debug, s->stream);
+                        s->d_debug, d_triWork, s->stream);
     DispatchLatePass<<<1, 1, 0, s->stream>>>(s->d_out, s->d_rays, s->d_unif,
-                                             s->d_rod, s->d_triRay, s->d_verts, s->d_index, s->ROBOT_COUNT, s->d_debug);
+                                             s->d_rod, s->d_triRay, s->d_verts, s->d_index, s->ROBOT_COUNT,
+                                             s->d_debug, d_triWork);
 
     launchRayCastOutputAsFloat(s->d_out, s->d_rays, s->d_rod,
                                s->ROBOT_COUNT, MAX_LIDAR_RAY_COUNT, s->stream);
@@ -1809,6 +1851,13 @@ void run_cuda_frame(CudaState*               s,
             t.num_early_t = (int)h_dbg[0];
             t.num_rtic    = (int)h_dbg[1];
         }
+        if (d_triWork) {
+            s->h_triWork.resize(s->N_TRIS);
+            CHECK_CUDA(cudaMemcpy(s->h_triWork.data(), d_triWork,
+                                  s->N_TRIS * sizeof(unsigned int), cudaMemcpyDeviceToHost));
+        } else {
+            s->h_triWork.clear();
+        }
     }
 
     // ---- readback into pinned buffer ----------------------------------------
@@ -1830,6 +1879,8 @@ void run_cuda_frame(CudaState*               s,
 // ===========================================================================
 // destroy_cuda  –  release all CUDA resources
 // ===========================================================================
+const std::vector<uint32_t>& cuda_tri_work(const CudaState* s) { return s->h_triWork; }
+
 void destroy_cuda(CudaState* s)
 {
     if (!s) return;
@@ -1837,6 +1888,7 @@ void destroy_cuda(CudaState* s)
     cudaFree(s->d_out);    cudaFree(s->d_unif);
     cudaFree(s->d_triRay); cudaFree(s->d_verts); cudaFree(s->d_index);
     if (s->d_debug) cudaFree(s->d_debug);
+    if (s->d_triWork) cudaFree(s->d_triWork);
     if (s->h_rods_pinned)    cudaFreeHost(s->h_rods_pinned);
     if (s->h_dynVbuf_pinned) cudaFreeHost(s->h_dynVbuf_pinned);
     if (s->h_out_pinned)     cudaFreeHost(s->h_out_pinned);

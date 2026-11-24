@@ -1,0 +1,17 @@
+{
+    "auto_hit_view_record_frame": -1,
+    "record_frames": 5,
+    "visualizer_on": true,
+    "mesh_vis_on": 4,
+    "cone_vis_on": false,
+    "cuda": {},
+    "cpu": {
+        "packet_size": 16
+    },
+    "batches": [
+        {
+            "backend": "grca-cuda",
+            "lidar_sim_rate": 10.0
+        }
+    ]
+}

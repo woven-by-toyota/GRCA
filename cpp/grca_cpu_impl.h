@@ -149,6 +149,11 @@ struct CpuState {
     std::vector<GrcaLidar> lidars;
     std::vector<SavedTri> passedTris;  // reused across frames to avoid per-frame allocation
     int packet_size = 8;               // 1 = scalar, 8 = AVX2
+
+    // Heat-map mode only (mesh_vis_on == 4); left empty otherwise so SavedTri and
+    // the benchmarked loop are unchanged.
+    std::vector<uint32_t> passedIdx;   // passedIdx[k] = index into tris of passedTris[k]
+    std::vector<uint32_t> triWork;     // rays tested per triangle this frame, indexed like tris
 };
 
 // ===========================================================================

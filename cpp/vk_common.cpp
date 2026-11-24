@@ -47,7 +47,7 @@ void initVulkanContext(VulkanContext& ctx, GLFWwindow* window, const char* title
     VkSurfaceFormatKHR surfFormat;
     uint32_t imageCount;
     createSwapchain(ctx.device, ctx.physicalDevice, ctx.surface, indices,
-                    ctx.extent, ctx.swapchain, surfFormat, imageCount);
+                    ctx.extent, ctx.swapchain, surfFormat, imageCount, ctx.noVsync);
     ctx.surfFormat = surfFormat;
     createImageViews(ctx.device, ctx.swapchain, surfFormat, ctx.imageViews);
     createRenderPass(ctx.device, surfFormat, ctx.renderPass);

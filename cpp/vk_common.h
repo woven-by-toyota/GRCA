@@ -100,6 +100,7 @@ struct VulkanContext {
     VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
     VkFence inFlightFence = VK_NULL_HANDLE;
     bool initialized = false;
+    bool noVsync     = false;  // scripted captures: never block in present (window may be covered)
     VkDeviceSize vertexBufferCapacity = 0;
     VkDeviceSize meshWireCapacity = 0;
     VkSurfaceFormatKHR surfFormat = {};
@@ -619,9 +620,13 @@ inline void fitCameraToHits(OrbitCamera& camera, const std::vector<GrcaHit>& hit
     camera.eye[2] = cz - fz * fitDist;
 }
 inline void initWindow(GLFWwindow*& window, const char* title = "Vulkan Viewer",
-                       int width = 1280, int height = 720) {
+                       int width = 1280, int height = 720, bool takeFocus = true) {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    if (!takeFocus) {  // scripted runs: keep keyboard focus with the user's current window
+        glfwWindowHint(GLFW_FOCUSED, GLFW_FALSE);
+        glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_FALSE);
+    }
     window = glfwCreateWindow(width, height, title, nullptr, nullptr);
 }
 
@@ -698,7 +703,7 @@ inline void createLogicalDevice(VkPhysicalDevice physicalDevice, QueueFamilyIndi
 inline void createSwapchain(VkDevice device, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface,
                              QueueFamilyIndices indices, VkExtent2D& extent,
                              VkSwapchainKHR& swapchain, VkSurfaceFormatKHR& surfFormat,
-                             uint32_t& imageCount) {
+                             uint32_t& imageCount, bool noVsync = false) {
     VkSurfaceCapabilitiesKHR caps;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, &caps);
 
@@ -727,6 +732,9 @@ inline void createSwapchain(VkDevice device, VkPhysicalDevice physicalDevice, Vk
     ci.imageExtent      = extent;
     ci.imageArrayLayers = 1;
     ci.imageUsage       = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    // Allow reading the presented image back (Hit Viewer PNG capture) where supported.
+    if (caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+        ci.imageUsage  |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     if (indices.graphicsFamily != indices.presentFamily) {
         ci.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
         ci.queueFamilyIndexCount = 2;
@@ -737,6 +745,14 @@ inline void createSwapchain(VkDevice device, VkPhysicalDevice physicalDevice, Vk
     ci.preTransform   = caps.currentTransform;
     ci.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
     ci.presentMode    = VK_PRESENT_MODE_FIFO_KHR;
+    if (noVsync) {  // prefer modes that never wait for the window to be shown
+        uint32_t pmCount = 0;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &pmCount, nullptr);
+        std::vector<VkPresentModeKHR> modes(pmCount);
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &pmCount, modes.data());
+        for (VkPresentModeKHR want : {VK_PRESENT_MODE_MAILBOX_KHR, VK_PRESENT_MODE_IMMEDIATE_KHR})
+            if (std::find(modes.begin(), modes.end(), want) != modes.end()) { ci.presentMode = want; break; }
+    }
     ci.clipped        = VK_TRUE;
     if (vkCreateSwapchainKHR(device, &ci, nullptr, &swapchain) != VK_SUCCESS)
         throw std::runtime_error("failed to create swapchain");
@@ -926,7 +942,7 @@ inline void rebuildSwapchain(VulkanContext& ctx) {
     VkSurfaceFormatKHR dummy;
     uint32_t imageCount;
     createSwapchain(ctx.device, ctx.physicalDevice, ctx.surface, ctx.queueIndices,
-                    ctx.extent, ctx.swapchain, dummy, imageCount);
+                    ctx.extent, ctx.swapchain, dummy, imageCount, ctx.noVsync);
     createImageViews(ctx.device, ctx.swapchain, ctx.surfFormat, ctx.imageViews);
     createDepthResources(ctx.device, ctx.physicalDevice, ctx.extent,
                          ctx.depthImage, ctx.depthMemory, ctx.depthImageView);
@@ -935,15 +951,16 @@ inline void rebuildSwapchain(VulkanContext& ctx) {
     allocateCommandBuffers(ctx.device, ctx.commandPool, ctx.framebuffers.size(), ctx.commandBuffers);
 }
 
-// Creates a CPU-visible/coherent vertex buffer of the given byte size, maps it,
-// and returns the persistent mapped pointer in mappedData.
+// Creates a CPU-visible/coherent buffer (vertex buffer by default) of the given
+// byte size, maps it, and returns the persistent mapped pointer in mappedData.
 inline void allocateMappedBuffer(VkDevice device, VkPhysicalDevice physicalDevice,
                                   VkDeviceSize size, VkBuffer& buffer,
-                                  VkDeviceMemory& memory, void*& mappedData) {
+                                  VkDeviceMemory& memory, void*& mappedData,
+                                  VkBufferUsageFlags usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT) {
     VkBufferCreateInfo bi{};
     bi.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     bi.size        = size;
-    bi.usage       = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    bi.usage       = usage;
     bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     if (vkCreateBuffer(device, &bi, nullptr, &buffer) != VK_SUCCESS)
         throw std::runtime_error("failed to create buffer");

@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <cstdio>
 
 struct VisState : OrbitCamera {
 	GLFWwindow* window    = nullptr;
@@ -26,10 +27,62 @@ struct VisState : OrbitCamera {
 	bool meshVisible      = true;
 	bool dynamicVisible   = true;
 	bool conesVisible     = false;
+	bool hitsVisible      = true;   // H toggles
+	bool aabbsVisible     = true;   // X toggles; off by default in heat-map mode
+	int  depthColormap    = 0;      // heat-map hit points: 0 = rainbow (near red -> far blue), 1 = grayscale (G toggles)
+	bool scripted         = false;  // vis_shots / auto_capture run: ignore keyboard/mouse (Esc still quits)
+	bool  depthShown      = false;  // last frame drew depth-coloured points
+	float depthNear = 0.f, depthFar = 0.f;  // their colour range (LiDAR range or camera depth)
+	bool imageRequested   = false;  // I pressed: grab the next rendered frame
+	bool imageReady       = false;  // pixels below hold an unclaimed capture
+	int  imageW = 0, imageH = 0;
+	std::vector<unsigned char> imageRGB;  // tightly packed RGB8, top row first
 	std::vector<VisLidar> lidars;
 };
 
 static VulkanContext g_vk;
+
+// Heat-map mode only: hit points coloured by depth (rainbow near red -> far blue, hit_point_heat.frag).
+static VkPipeline g_heatPointPipeline     = VK_NULL_HANDLE;
+static VkPipeline g_heatPointGrayPipeline = VK_NULL_HANDLE;  // grayscale depth (hit_point_heat_gray.frag)
+
+// Colouring currently selected (mesh_vis_on semantics, 1..4), also while meshes are hidden with M.
+static int selectedMeshMode(const VisState* vs) {
+	return vs->visMode > 0 ? vs->visMode : vs->savedVisMode;
+}
+
+// Host-visible readback buffer for PNG capture (grown on demand).
+static VkBuffer       g_capBuffer = VK_NULL_HANDLE;
+static VkDeviceMemory g_capMemory = VK_NULL_HANDLE;
+static void*          g_capMapped = nullptr;
+static VkDeviceSize   g_capCapacity = 0;
+
+static void ensureCaptureBuffer(VkDeviceSize needed) {
+	if (needed <= g_capCapacity) return;
+	if (g_capBuffer != VK_NULL_HANDLE) {
+		vkDeviceWaitIdle(g_vk.device);
+		vkUnmapMemory(g_vk.device, g_capMemory);
+		vkDestroyBuffer(g_vk.device, g_capBuffer, nullptr);
+		vkFreeMemory(g_vk.device, g_capMemory, nullptr);
+		g_capBuffer = VK_NULL_HANDLE; g_capMemory = VK_NULL_HANDLE; g_capMapped = nullptr;
+	}
+	allocateMappedBuffer(g_vk.device, g_vk.physicalDevice, needed,
+	                     g_capBuffer, g_capMemory, g_capMapped, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	g_capCapacity = needed;
+}
+
+static bool swapchainSupportsCapture() {
+	VkSurfaceCapabilitiesKHR caps;
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(g_vk.physicalDevice, g_vk.surface, &caps);
+	if (!(caps.supportedUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT)) return false;
+	switch (g_vk.surfFormat.format) {
+	case VK_FORMAT_B8G8R8A8_SRGB: case VK_FORMAT_B8G8R8A8_UNORM:
+	case VK_FORMAT_R8G8B8A8_SRGB: case VK_FORMAT_R8G8B8A8_UNORM:
+		return true;
+	default:
+		return false;
+	}
+}
 
 static bool normalize3(float& x, float& y, float& z) {
 	float len = sqrtf(x*x + y*y + z*z);
@@ -215,13 +268,16 @@ VisState* vis_init(const RunConfig& cfg) {
 	vs->meshVisible = (cfg.mesh_vis_on > 0);
 	vs->dynamicVisible = (cfg.mesh_vis_on > 0);
 	vs->conesVisible = cfg.cone_vis_on;
-	initWindow(vs->window, "Hit Vulkan Viewer", 1000, 1000);
+	vs->aabbsVisible = (cfg.mesh_vis_on != MESH_VIS_HEAT);  // bounding boxes would clutter the heat map
+	vs->scripted     = cfg.vis_scripted;  // stray key presses must not change a scripted render
+	initWindow(vs->window, "Hit Vulkan Viewer", cfg.vis_window_w, cfg.vis_window_h, !cfg.vis_scripted);
 	g_vk.initialized = false;
+	g_vk.noVsync = cfg.vis_scripted;
 
 	glfwSetWindowUserPointer(vs->window, vs);
 	glfwSetCursorPosCallback(vs->window, [](GLFWwindow* win, double xpos, double ypos) {
 		VisState* s = (VisState*)glfwGetWindowUserPointer(win);
-		if (!s->mouseLocked) return;
+		if (s->scripted || !s->mouseLocked) return;
 		if (s->skipFirst) {
 			s->skipFirst = false;
 			s->lastX = float(xpos); s->lastY = float(ypos);
@@ -236,12 +292,14 @@ VisState* vis_init(const RunConfig& cfg) {
 	});
 	glfwSetScrollCallback(vs->window, [](GLFWwindow* win, double, double yoff) {
 		VisState* s = (VisState*)glfwGetWindowUserPointer(win);
+		if (s->scripted) return;
 		s->distance *= powf(1.1f, float(yoff));
 		if (s->distance < 0.1f) s->distance = 0.1f;
 	});
 	glfwSetKeyCallback(vs->window, [](GLFWwindow* win, int key, int, int action, int) {
 		if (action != GLFW_PRESS) return;
 		VisState* s = (VisState*)glfwGetWindowUserPointer(win);
+		if (s->scripted && key != GLFW_KEY_ESCAPE) return;  // scripted render: keys could move the camera
 		switch (key) {
 		case GLFW_KEY_T:
 			s->cycleLidarRequested = true;
@@ -272,6 +330,17 @@ VisState* vis_init(const RunConfig& cfg) {
 			s->conesVisible = !s->conesVisible;
 			break;
 		case GLFW_KEY_O:      s->captureRequested = true; break;
+		case GLFW_KEY_H:      s->hitsVisible = !s->hitsVisible; break;
+		case GLFW_KEY_X:      s->aabbsVisible = !s->aabbsVisible; break;
+		case GLFW_KEY_G:      s->depthColormap = 1 - s->depthColormap; break;
+		case GLFW_KEY_V: {    // cycle mesh colouring: 1 wireframe, 2 solid, 3 flat colour, 4 heat map
+			const int m = selectedMeshMode(s) % 4 + 1;
+			s->visMode = s->savedVisMode = m;
+			s->meshVisible = s->dynamicVisible = true;
+			fprintf(stderr, "[vis] mesh_vis_on = %d\n", m);
+			break;
+		}
+		case GLFW_KEY_I:      s->imageRequested = true; break;
 		case GLFW_KEY_ESCAPE: glfwSetWindowShouldClose(win, GLFW_TRUE); break;
 		case GLFW_KEY_F:
 		case GLFW_KEY_KP_0:   s->refitRequested = true; break;
@@ -308,6 +377,15 @@ VisState* vis_init(const RunConfig& cfg) {
 	auto fragCode = readFile("build/hit_point.frag.spv");
 	g_vk.graphicsPipeline = createPointCloudPipeline(
 		g_vk.device, g_vk.extent, g_vk.pipelineLayout, g_vk.renderPass, vertCode, fragCode);
+	{   // depth-coloured points, used whenever the heat map is selected (also via V at runtime)
+		auto heatFragCode = readFile("build/hit_point_heat.frag.spv");
+		g_heatPointPipeline = createPointCloudPipeline(
+			g_vk.device, g_vk.extent, g_vk.pipelineLayout, g_vk.renderPass, vertCode, heatFragCode);
+		auto grayFragCode = readFile("build/hit_point_heat_gray.frag.spv");
+		auto camDepthVertCode = readFile("build/hit_point_camdepth.vert.spv");  // camera depth, not LiDAR range
+		g_heatPointGrayPipeline = createPointCloudPipeline(
+			g_vk.device, g_vk.extent, g_vk.pipelineLayout, g_vk.renderPass, camDepthVertCode, grayFragCode);
+	}
 
 	// Create mesh wireframe pipeline
 	auto mwVertCode = readFile("build/mesh_wire.vert.spv");
@@ -419,6 +497,25 @@ void vis_update(VisState* vs, const std::vector<GrcaHit>& hits, const RunConfig&
 			if (!isMiss && d > maxDist) maxDist = d;
 		}
 		if (minDist > maxDist) { minDist = 0.0f; maxDist = 1.0f; }
+		// Heat map: depth colours span the 2nd..98th percentile of hit distances, so a few
+		// far returns do not squeeze every nearby point into the first colour.
+		if (selectedMeshMode(vs) == MESH_VIS_HEAT) {
+			std::vector<float> ds;
+			const size_t step = std::max<size_t>(1, hits.size() / 65536);
+			for (size_t i = 0; i < hits.size(); i += step) {
+				const float d = hits[i].dist;
+				if (d > 0.0f && d < rangeMaxCfg * 0.9999f) ds.push_back(d);
+			}
+			if (ds.size() >= 16) {
+				auto pct = [&](double f) {
+					auto it = ds.begin() + (long)(f * (double)(ds.size() - 1));
+					std::nth_element(ds.begin(), it, ds.end());
+					return *it;
+				};
+				const float lo = pct(0.02), hi = pct(0.98);
+				if (hi > lo) { minDist = lo; maxDist = hi; }
+			}
+		}
 	}
 
 	// WASD/QE movement — active when mouse is locked (Ctrl toggles)
@@ -453,6 +550,32 @@ void vis_update(VisState* vs, const std::vector<GrcaHit>& hits, const RunConfig&
 	const float fovY = vs->lidarFollowMode ? 1.919862f : 0.785398f; // 110 deg in follow mode, 45 deg otherwise
 	makePerspective(fovY, (float)g_vk.extent.width / (float)g_vk.extent.height, 0.1f, 100000.0f, proj);
 	matMul(proj, view, mvp);
+
+	// Grayscale depth pass: colour range = 2nd..98th percentile of the points' camera depth
+	// (distance along the view direction), so the image reads as a linear depth map.
+	const bool depthPoints = (selectedMeshMode(vs) == MESH_VIS_HEAT) && vs->hitsVisible && !hits.empty();
+	if (depthPoints && vs->depthColormap == 1) {
+		std::vector<float> zs;
+		const size_t step = std::max<size_t>(1, hits.size() / 65536);
+		for (size_t i = 0; i < hits.size(); i += step) {
+			const float d = hits[i].dist;
+			if (!(d > 0.0f && d < rangeMaxCfg * 0.9999f)) continue;
+			const float z = (hits[i].hx - vs->eye[0]) * fx + (hits[i].hy - vs->eye[1]) * fy + (hits[i].hz - vs->eye[2]) * fz;
+			if (z > 0.1f) zs.push_back(z);
+		}
+		if (zs.size() >= 16) {
+			auto pct = [&](double f) {
+				auto it = zs.begin() + (long)(f * (double)(zs.size() - 1));
+				std::nth_element(zs.begin(), it, zs.end());
+				return *it;
+			};
+			const float lo = pct(0.02), hi = pct(0.98);
+			if (hi > lo) { minDist = lo; maxDist = hi; }
+		}
+	}
+	vs->depthShown = depthPoints;
+	vs->depthNear  = minDist;
+	vs->depthFar   = maxDist;
 
 	float pushData[18];
 	memcpy(pushData, mvp, 16 * sizeof(float));
@@ -552,8 +675,15 @@ void vis_update(VisState* vs, const std::vector<GrcaHit>& hits, const RunConfig&
 	}
 
 	// Draw hit points
-	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_vk.graphicsPipeline);
-	if (!hits.empty()) {
+	{
+		VkPipeline pointPipe = g_vk.graphicsPipeline;  // red points outside the heat map
+		if (selectedMeshMode(vs) == MESH_VIS_HEAT) {
+			VkPipeline depthPipe = (vs->depthColormap == 1) ? g_heatPointGrayPipeline : g_heatPointPipeline;
+			if (depthPipe != VK_NULL_HANDLE) pointPipe = depthPipe;
+		}
+		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pointPipe);
+	}
+	if (vs->hitsVisible && !hits.empty()) {
 		VkDeviceSize offset = 0;
 		vkCmdBindVertexBuffers(cmd, 0, 1, &g_vk.vertexBuffer, &offset);
 		vkCmdPushConstants(cmd, g_vk.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushData), pushData);
@@ -561,7 +691,7 @@ void vis_update(VisState* vs, const std::vector<GrcaHit>& hits, const RunConfig&
 	}
 
 	// AABB wireframes last (always visible, on top of everything)
-	if (g_vk.aabbWireVertexCount > 0 && g_vk.aabbWireBuffer != VK_NULL_HANDLE) {
+	if (vs->aabbsVisible && g_vk.aabbWireVertexCount > 0 && g_vk.aabbWireBuffer != VK_NULL_HANDLE) {
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_vk.meshWirePipeline);
 		vkCmdSetLineWidth(cmd, 3.0f);
 		VkDeviceSize offset = 0;
@@ -571,6 +701,61 @@ void vis_update(VisState* vs, const std::vector<GrcaHit>& hits, const RunConfig&
 	}
 
 	vkCmdEndRenderPass(cmd);
+
+	// PNG capture (I key): copy the just-rendered swapchain image into a host buffer,
+	// inside this frame's command buffer so it is ordered before present.
+	bool doCapture = false;
+	if (vs->imageRequested) {
+		vs->imageRequested = false;
+		if (!swapchainSupportsCapture()) {
+			fprintf(stderr, "[vis] PNG capture unsupported for this swapchain (usage/format)\n");
+		} else {
+			doCapture = true;
+			const uint32_t w = g_vk.extent.width, h = g_vk.extent.height;
+			ensureCaptureBuffer((VkDeviceSize)w * h * 4);
+			uint32_t n = 0;
+			vkGetSwapchainImagesKHR(g_vk.device, g_vk.swapchain, &n, nullptr);
+			std::vector<VkImage> images(n);
+			vkGetSwapchainImagesKHR(g_vk.device, g_vk.swapchain, &n, images.data());
+
+			VkImageMemoryBarrier toSrc{};
+			toSrc.sType               = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+			toSrc.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			toSrc.dstAccessMask       = VK_ACCESS_TRANSFER_READ_BIT;
+			toSrc.oldLayout           = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;  // render pass finalLayout
+			toSrc.newLayout           = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			toSrc.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			toSrc.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			toSrc.image               = images[imageIndex];
+			toSrc.subresourceRange    = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			                     VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &toSrc);
+
+			VkBufferImageCopy region{};
+			region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+			region.imageExtent      = {w, h, 1};
+			vkCmdCopyImageToBuffer(cmd, images[imageIndex], VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			                       g_capBuffer, 1, &region);
+
+			VkImageMemoryBarrier toPresent = toSrc;
+			toPresent.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			toPresent.dstAccessMask = 0;
+			toPresent.oldLayout     = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			toPresent.newLayout     = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+			VkBufferMemoryBarrier toHost{};
+			toHost.sType               = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+			toHost.srcAccessMask       = VK_ACCESS_TRANSFER_WRITE_BIT;
+			toHost.dstAccessMask       = VK_ACCESS_HOST_READ_BIT;
+			toHost.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			toHost.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			toHost.buffer              = g_capBuffer;
+			toHost.size                = VK_WHOLE_SIZE;
+			vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			                     VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT | VK_PIPELINE_STAGE_HOST_BIT,
+			                     0, 0, nullptr, 1, &toHost, 1, &toPresent);
+		}
+	}
+
 	vkEndCommandBuffer(cmd);
 
 	VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
@@ -595,6 +780,142 @@ void vis_update(VisState* vs, const std::vector<GrcaHit>& hits, const RunConfig&
 	presentInfo.pImageIndices = &imageIndex;
 
 	vkQueuePresentKHR(g_vk.presentQueue, &presentInfo);
+
+	if (doCapture) {
+		// Wait for this frame's commands (fence is reset at the start of the next frame).
+		vkWaitForFences(g_vk.device, 1, &g_vk.inFlightFence, VK_TRUE, UINT64_MAX);
+		const uint32_t w = g_vk.extent.width, h = g_vk.extent.height;
+		const bool bgra = (g_vk.surfFormat.format == VK_FORMAT_B8G8R8A8_SRGB ||
+		                   g_vk.surfFormat.format == VK_FORMAT_B8G8R8A8_UNORM);
+		const unsigned char* src = (const unsigned char*)g_capMapped;
+		vs->imageRGB.resize((size_t)w * h * 3);
+		for (size_t i = 0, n = (size_t)w * h; i < n; ++i) {
+			vs->imageRGB[i*3+0] = src[i*4 + (bgra ? 2 : 0)];
+			vs->imageRGB[i*3+1] = src[i*4 + 1];
+			vs->imageRGB[i*3+2] = src[i*4 + (bgra ? 0 : 2)];
+		}
+		vs->imageW = (int)w; vs->imageH = (int)h;
+		vs->imageReady = true;
+	}
+}
+
+void vis_request_image(VisState* vs) {
+	if (vs) vs->imageRequested = true;
+}
+
+bool vis_depth_mapping(const VisState* vs, float& near, float& far, int& colormap) {
+	if (!vs || !vs->depthShown) return false;
+	near = vs->depthNear; far = vs->depthFar; colormap = vs->depthColormap;
+	return true;
+}
+
+int vis_mesh_mode(const VisState* vs) {
+	return vs ? selectedMeshMode(vs) : 0;
+}
+
+void vis_apply_view(VisState* vs, const VisView& v) {
+	if (!vs) return;
+	if (v.mesh_mode > 0) {
+		vs->visMode = vs->savedVisMode = v.mesh_mode;
+		vs->meshVisible = vs->dynamicVisible = true;
+	} else if (v.mesh_mode == 0) {
+		vs->meshVisible = vs->dynamicVisible = false;
+	}
+	if (v.static_meshes  >= 0) vs->meshVisible    = (v.static_meshes  != 0);
+	if (v.dynamic_meshes >= 0) vs->dynamicVisible = (v.dynamic_meshes != 0);
+	// Same rule as the M/B keys: visMode 0 <=> no mesh shown; colouring kept in savedVisMode.
+	if (!vs->meshVisible && !vs->dynamicVisible) {
+		if (vs->visMode > 0) vs->savedVisMode = vs->visMode;
+		vs->visMode = 0;
+	} else if (vs->visMode == 0) {
+		vs->visMode = std::max(1, vs->savedVisMode);
+	}
+	if (v.hits  >= 0) vs->hitsVisible  = (v.hits  != 0);
+	if (v.aabbs >= 0) vs->aabbsVisible = (v.aabbs != 0);
+	if (v.cones >= 0) vs->conesVisible = (v.cones != 0);
+	if (v.depth_colormap >= 0) vs->depthColormap = v.depth_colormap;
+}
+
+bool vis_take_image(VisState* vs, std::vector<unsigned char>& rgb, int& w, int& h) {
+	if (!vs || !vs->imageReady) return false;
+	vs->imageReady = false;
+	rgb.swap(vs->imageRGB);
+	w = vs->imageW; h = vs->imageH;
+	return true;
+}
+
+// ---------------------------------------------------------------------------
+// Minimal dependency-free PNG writer: RGB8, zlib "stored" (uncompressed) blocks.
+// Files are larger than compressed PNGs; recompress with e.g. optipng if needed.
+// ---------------------------------------------------------------------------
+static uint32_t pngCrc(const unsigned char* data, size_t len, uint32_t crc = 0xFFFFFFFFu) {
+	static uint32_t table[256];
+	static bool init = false;
+	if (!init) {
+		for (uint32_t n = 0; n < 256; ++n) {
+			uint32_t c = n;
+			for (int k = 0; k < 8; ++k) c = (c & 1u) ? 0xEDB88320u ^ (c >> 1) : (c >> 1);
+			table[n] = c;
+		}
+		init = true;
+	}
+	for (size_t i = 0; i < len; ++i) crc = table[(crc ^ data[i]) & 0xFFu] ^ (crc >> 8);
+	return crc;
+}
+
+bool vis_write_png(const std::string& path, int w, int h, const unsigned char* rgb) {
+	if (w <= 0 || h <= 0 || !rgb) return false;
+	FILE* f = fopen(path.c_str(), "wb");
+	if (!f) return false;
+	auto be32 = [](unsigned char* p, uint32_t v) { p[0]=(unsigned char)(v>>24); p[1]=(unsigned char)(v>>16); p[2]=(unsigned char)(v>>8); p[3]=(unsigned char)v; };
+	auto chunk = [&](const char type[4], const std::vector<unsigned char>& data) {
+		unsigned char len[4]; be32(len, (uint32_t)data.size());
+		fwrite(len, 1, 4, f);
+		std::vector<unsigned char> td(4 + data.size());
+		memcpy(td.data(), type, 4);
+		if (!data.empty()) memcpy(td.data() + 4, data.data(), data.size());
+		fwrite(td.data(), 1, td.size(), f);
+		unsigned char crc[4]; be32(crc, pngCrc(td.data(), td.size()) ^ 0xFFFFFFFFu);
+		fwrite(crc, 1, 4, f);
+	};
+	static const unsigned char sig[8] = {0x89,'P','N','G',0x0D,0x0A,0x1A,0x0A};
+	fwrite(sig, 1, 8, f);
+
+	std::vector<unsigned char> ihdr(13, 0);
+	be32(&ihdr[0], (uint32_t)w); be32(&ihdr[4], (uint32_t)h);
+	ihdr[8] = 8; ihdr[9] = 2;  // 8-bit, truecolour RGB; compression/filter/interlace = 0
+	chunk("IHDR", ihdr);
+
+	// Raw scanlines: filter byte 0 + RGB row.
+	const size_t rowBytes = (size_t)w * 3;
+	std::vector<unsigned char> raw((rowBytes + 1) * (size_t)h);
+	for (int y = 0; y < h; ++y) {
+		raw[(size_t)y * (rowBytes + 1)] = 0;
+		memcpy(&raw[(size_t)y * (rowBytes + 1) + 1], rgb + (size_t)y * rowBytes, rowBytes);
+	}
+	// zlib stream of stored deflate blocks (max 65535 bytes each) + Adler-32.
+	std::vector<unsigned char> z;
+	z.reserve(raw.size() + raw.size() / 65535 * 5 + 16);
+	z.push_back(0x78); z.push_back(0x01);
+	size_t pos = 0;
+	do {
+		const size_t n = std::min<size_t>(65535, raw.size() - pos);
+		const bool last = (pos + n == raw.size());
+		z.push_back(last ? 1 : 0);
+		z.push_back((unsigned char)(n & 0xFF)); z.push_back((unsigned char)(n >> 8));
+		z.push_back((unsigned char)(~n & 0xFF)); z.push_back((unsigned char)((~n >> 8) & 0xFF));
+		z.insert(z.end(), raw.begin() + pos, raw.begin() + pos + n);
+		pos += n;
+	} while (pos < raw.size());
+	uint32_t a = 1, b = 0;
+	for (unsigned char c : raw) { a = (a + c) % 65521u; b = (b + a) % 65521u; }
+	unsigned char ad[4]; be32(ad, (b << 16) | a);
+	z.insert(z.end(), ad, ad + 4);
+	chunk("IDAT", z);
+	chunk("IEND", {});
+	const bool ok = (ferror(f) == 0);
+	fclose(f);
+	return ok;
 }
 
 bool vis_running(VisState* vs) {
@@ -618,7 +939,10 @@ static void uploadMeshVertices(float*& wireDst, float*& solidDst, const VisMesh&
 		} else {
 			r = m.color[0]; g = m.color[1]; b = m.color[2];
 		}
-		const float wr = r*0.3f, wg = g*0.3f, wb = b*0.3f;
+		const bool  wireSet = (m.wire_color[0] >= 0.f);   // per-mesh edge colour (e.g. white on black)
+		const float wr = wireSet ? m.wire_color[0] : r*0.3f;
+		const float wg = wireSet ? m.wire_color[1] : g*0.3f;
+		const float wb = wireSet ? m.wire_color[2] : b*0.3f;
 		const auto& tri = m.tris[t];
 		solidDst[ 0]=tri.v[0][0]; solidDst[ 1]=tri.v[0][1]; solidDst[ 2]=tri.v[0][2]; solidDst[ 3]=r;  solidDst[ 4]=g;  solidDst[ 5]=b;
 		solidDst[ 6]=tri.v[1][0]; solidDst[ 7]=tri.v[1][1]; solidDst[ 8]=tri.v[1][2]; solidDst[ 9]=r;  solidDst[10]=g;  solidDst[11]=b;
@@ -794,11 +1118,23 @@ void vis_set_lidars(VisState* vs, const std::vector<VisLidar>& lidars) {
 	if (!g_vk.initialized) return;
 	const int SEGS = 16;
 	const size_t vertsPerLidar = (size_t)SEGS * 4 * 3; // 4 tris per seg, 3 verts each
-	const size_t totalVerts = lidars.size() * vertsPerLidar;
+	// x2: every triangle is also emitted with reversed winding (double-sided), so the solid
+	// pipeline's back-face culling never hides part of the cylinder.
+	const size_t totalVerts = lidars.size() * vertsPerLidar * 2;
 	if (totalVerts == 0) { g_vk.lidarSolidVertexCount = 0; return; }
 	ensureLidarSolidBuffer(totalVerts);
 	float* dst = (float*)g_vk.mappedLidarSolidData;
-	for (const auto& L : lidars) uploadCylinder(dst, L);
+	for (const auto& L : lidars) {
+		const float* front = dst;
+		uploadCylinder(dst, L);
+		for (size_t t = 0; t < vertsPerLidar / 3; ++t) {   // back faces: vertex order 0, 2, 1
+			const float* tri = front + t * 18;               // 3 verts x (pos + colour)
+			memcpy(dst,      tri,      6 * sizeof(float));
+			memcpy(dst + 6,  tri + 12, 6 * sizeof(float));
+			memcpy(dst + 12, tri + 6,  6 * sizeof(float));
+			dst += 18;
+		}
+	}
 	g_vk.lidarSolidVertexCount = (uint32_t)totalVerts;
 }
 
@@ -897,6 +1233,12 @@ void vis_update_aabbs(VisState* vs, const std::vector<VisAABB>& aabbs) {
 void vis_destroy(VisState* vs) {
 	if (!g_vk.initialized) return;
 	vkDeviceWaitIdle(g_vk.device);
+	if (g_capBuffer != VK_NULL_HANDLE) {
+		vkUnmapMemory(g_vk.device, g_capMemory);
+		vkDestroyBuffer(g_vk.device, g_capBuffer, nullptr);
+		vkFreeMemory(g_vk.device, g_capMemory, nullptr);
+		g_capBuffer = VK_NULL_HANDLE; g_capMemory = VK_NULL_HANDLE; g_capMapped = nullptr; g_capCapacity = 0;
+	}
 	if (g_vk.vertexBuffer != VK_NULL_HANDLE) {
 		vkUnmapMemory(g_vk.device, g_vk.vertexMemory);
 		vkDestroyBuffer(g_vk.device, g_vk.vertexBuffer, nullptr);
@@ -932,6 +1274,14 @@ void vis_destroy(VisState* vs) {
 	vkDestroyPipeline(g_vk.device, g_vk.meshSolidPipeline, nullptr);
 	vkDestroyPipeline(g_vk.device, g_vk.meshWirePipeline, nullptr);
 	vkDestroyPipeline(g_vk.device, g_vk.graphicsPipeline, nullptr);
+	if (g_heatPointPipeline != VK_NULL_HANDLE) {
+		vkDestroyPipeline(g_vk.device, g_heatPointPipeline, nullptr);
+		g_heatPointPipeline = VK_NULL_HANDLE;
+	}
+	if (g_heatPointGrayPipeline != VK_NULL_HANDLE) {
+		vkDestroyPipeline(g_vk.device, g_heatPointGrayPipeline, nullptr);
+		g_heatPointGrayPipeline = VK_NULL_HANDLE;
+	}
 	vkDestroyPipelineLayout(g_vk.device, g_vk.pipelineLayout, nullptr);
 	destroyVulkanContext(g_vk);
 	if (vs && vs->window) cleanup(vs->window);
