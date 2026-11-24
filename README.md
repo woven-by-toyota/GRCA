@@ -6,7 +6,7 @@ Unified multi-backend LiDAR benchmark for Ubuntu 22.04 and 24.04, used for evalu
 Ray-Triangle Filtering in Arbitrarily Dynamic LiDAR Simulation](https://arxiv.org/abs/2605.10457)
 
 Qualitative results for the paper can be found at:
-[[I]RCA Visualization](https://anonymous.4open.science/r/-I-RCA-Visualization/README.md)
+[GRCA Visualization](visualization/README.md)
 
 The mesh files evaluated for the paper and required for this repository can be downloaded from [mesh.zip](https://zenodo.org/records/21127672/files/mesh.zip?download=1&preview=1). Unzip and copy paste to GRCA project root:
 
