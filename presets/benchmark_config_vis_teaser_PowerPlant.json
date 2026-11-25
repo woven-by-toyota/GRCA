@@ -5,7 +5,7 @@
         "configs/scenes/PowerPlant.json"
     ],
     "benchmark_robots": [
-        "configs/robots/vis_teaser_robot_15m.json"
+        "configs/robots/vis_teaser_robot_200m.json"
     ],
     "active_tests": [
         "configs/tests/vis_teaser.json"
@@ -21,21 +21,22 @@
             "name": "1_plain",
             "robot_w_positions": [
                 [
-                    -2.197,
-                    11.604,
-                    78.618
+                    -25.0,
+                    10.5,
+                    72.0
                 ]
             ],
             "w_cam_position": [
-                -5.733,
-                13.904,
-                82.154
+                -28.5,
+                9.5,
+                72.0
             ],
             "w_cam_forward": [
-                0.6063,
-                -0.5145,
-                -0.6063
+                0.766,
+                0.6428,
+                0.0
             ],
+            "w_cam_fov": 90,
             "aabb_vis_on": false,
             "cone_vis_on": false,
             "mesh_vis_on": 3,
@@ -57,21 +58,22 @@
             "name": "2_heat",
             "robot_w_positions": [
                 [
-                    -2.197,
-                    11.604,
-                    78.618
+                    -25.0,
+                    10.5,
+                    72.0
                 ]
             ],
             "w_cam_position": [
-                -5.733,
-                13.904,
-                82.154
+                -28.5,
+                9.5,
+                72.0
             ],
             "w_cam_forward": [
-                0.6063,
-                -0.5145,
-                -0.6063
+                0.766,
+                0.6428,
+                0.0
             ],
+            "w_cam_fov": 90,
             "aabb_vis_on": false,
             "cone_vis_on": false,
             "mesh_vis_on": 4,
@@ -82,21 +84,22 @@
             "name": "3_rainbow",
             "robot_w_positions": [
                 [
-                    -2.197,
-                    11.604,
-                    78.618
+                    -25.0,
+                    10.5,
+                    72.0
                 ]
             ],
             "w_cam_position": [
-                -5.733,
-                13.904,
-                82.154
+                -28.5,
+                9.5,
+                72.0
             ],
             "w_cam_forward": [
-                0.6063,
-                -0.5145,
-                -0.6063
+                0.766,
+                0.6428,
+                0.0
             ],
+            "w_cam_fov": 90,
             "aabb_vis_on": false,
             "cone_vis_on": false,
             "mesh_vis_on": 4,
@@ -110,21 +113,22 @@
             "name": "4_gray",
             "robot_w_positions": [
                 [
-                    -2.197,
-                    11.604,
-                    78.618
+                    -25.0,
+                    10.5,
+                    72.0
                 ]
             ],
             "w_cam_position": [
-                -5.733,
-                13.904,
-                82.154
+                -28.5,
+                9.5,
+                72.0
             ],
             "w_cam_forward": [
-                0.6063,
-                -0.5145,
-                -0.6063
+                0.766,
+                0.6428,
+                0.0
             ],
+            "w_cam_fov": 90,
             "aabb_vis_on": false,
             "cone_vis_on": false,
             "mesh_vis_on": 4,

@@ -31,6 +31,7 @@ struct VisState : OrbitCamera {
 	bool aabbsVisible     = true;   // X toggles; off by default in heat-map mode
 	int  depthColormap    = 0;      // heat-map hit points: 0 = rainbow (near red -> far blue), 1 = grayscale (G toggles)
 	float meshWireWidth   = 1.0f;   // mesh edge width outside the heat map (wire_width)
+	float camFovY         = 0.785398f; // free-camera vertical FOV in radians (w_cam_fov; 45 deg)
 	bool scripted         = false;  // vis_shots / auto_capture run: ignore keyboard/mouse (Esc still quits)
 	bool  depthShown      = false;  // last frame drew depth-coloured points
 	float depthNear = 0.f, depthFar = 0.f;  // their colour range (LiDAR range or camera depth)
@@ -548,7 +549,7 @@ void vis_update(VisState* vs, const std::vector<GrcaHit>& hits, const RunConfig&
 	if (fabsf(vs->pitch) > 1.4f) { up[0] = 0; up[1] = 0; up[2] = (vs->pitch > 0) ? -1.0f : 1.0f; }
 	float view[16], proj[16], mvp[16];
 	makeLookAt(vs->eye, target, up, view);
-	const float fovY = vs->lidarFollowMode ? 1.919862f : 0.785398f; // 110 deg in follow mode, 45 deg otherwise
+	const float fovY = vs->lidarFollowMode ? 1.919862f : vs->camFovY; // 110 deg in follow mode
 	makePerspective(fovY, (float)g_vk.extent.width / (float)g_vk.extent.height, 0.1f, 100000.0f, proj);
 	matMul(proj, view, mvp);
 
@@ -836,6 +837,7 @@ void vis_apply_view(VisState* vs, const VisView& v) {
 	if (v.cones >= 0) vs->conesVisible = (v.cones != 0);
 	if (v.depth_colormap >= 0) vs->depthColormap = v.depth_colormap;
 	if (v.wire_width > 0.f) vs->meshWireWidth = v.wire_width;
+	if (v.cam_fov_deg > 0.f) vs->camFovY = std::min(v.cam_fov_deg, 170.f) * 0.01745329f;
 }
 
 bool vis_take_image(VisState* vs, std::vector<unsigned char>& rgb, int& w, int& h) {

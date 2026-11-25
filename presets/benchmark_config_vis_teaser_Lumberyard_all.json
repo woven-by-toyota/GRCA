@@ -5,7 +5,7 @@
         "configs/scenes/Lumberyard_all.json"
     ],
     "benchmark_robots": [
-        "configs/robots/vis_teaser_robot_15m.json"
+        "configs/robots/vis_teaser_robot_50m.json"
     ],
     "active_tests": [
         "configs/tests/vis_teaser.json"
@@ -27,14 +27,14 @@
                 ]
             ],
             "w_cam_position": [
-                1.75,
-                8.41,
-                24.142
+                5.993,
+                0.75,
+                19.899
             ],
             "w_cam_forward": [
-                0.6211,
-                -0.478,
-                -0.6211
+                0.7178,
+                0.4384,
+                -0.5409
             ],
             "aabb_vis_on": false,
             "cone_vis_on": false,
@@ -50,7 +50,8 @@
                 0.0
             ],
             "wire_width": 1,
-            "hit_vis_on": false
+            "hit_vis_on": false,
+            "w_cam_fov": 90
         },
         {
             "frame": 1,
@@ -63,19 +64,20 @@
                 ]
             ],
             "w_cam_position": [
-                1.75,
-                8.41,
-                24.142
+                5.993,
+                0.75,
+                19.899
             ],
             "w_cam_forward": [
-                0.6211,
-                -0.478,
-                -0.6211
+                0.7178,
+                0.4384,
+                -0.5409
             ],
             "aabb_vis_on": false,
             "cone_vis_on": false,
             "mesh_vis_on": 4,
-            "hit_vis_on": false
+            "hit_vis_on": false,
+            "w_cam_fov": 90
         },
         {
             "frame": 2,
@@ -88,14 +90,14 @@
                 ]
             ],
             "w_cam_position": [
-                1.75,
-                8.41,
-                24.142
+                5.993,
+                0.75,
+                19.899
             ],
             "w_cam_forward": [
-                0.6211,
-                -0.478,
-                -0.6211
+                0.7178,
+                0.4384,
+                -0.5409
             ],
             "aabb_vis_on": false,
             "cone_vis_on": false,
@@ -103,7 +105,8 @@
             "static_mesh_vis_on": false,
             "dynamic_mesh_vis_on": false,
             "hit_vis_on": true,
-            "hit_depth_colormap": "rainbow"
+            "hit_depth_colormap": "rainbow",
+            "w_cam_fov": 90
         },
         {
             "frame": 3,
@@ -116,14 +119,14 @@
                 ]
             ],
             "w_cam_position": [
-                1.75,
-                8.41,
-                24.142
+                5.993,
+                0.75,
+                19.899
             ],
             "w_cam_forward": [
-                0.6211,
-                -0.478,
-                -0.6211
+                0.7178,
+                0.4384,
+                -0.5409
             ],
             "aabb_vis_on": false,
             "cone_vis_on": false,
@@ -131,7 +134,8 @@
             "static_mesh_vis_on": false,
             "dynamic_mesh_vis_on": false,
             "hit_vis_on": true,
-            "hit_depth_colormap": "gray"
+            "hit_depth_colormap": "gray",
+            "w_cam_fov": 90
         }
     ]
 }

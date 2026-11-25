@@ -1457,6 +1457,7 @@ int main(int argc, char** argv)
                 rgb("mesh_color", v.mesh_color);   // every mesh, outside the heat map
                 rgb("wire_color", v.wire_color);
                 if (o.contains("wire_width")) v.wire_width = o["wire_width"].get<float>();
+                if (o.contains("w_cam_fov"))  v.cam_fov_deg = o["w_cam_fov"].get<float>();  // vertical, degrees
             };
             {
                 VisView top;
@@ -1470,6 +1471,7 @@ int main(int argc, char** argv)
                 if (top.mesh_color[0]  >= 0.f) std::copy(top.mesh_color, top.mesh_color + 3, vis_view_global.mesh_color);
                 if (top.wire_color[0]  >= 0.f) std::copy(top.wire_color, top.wire_color + 3, vis_view_global.wire_color);
                 if (top.wire_width     >  0.f) vis_view_global.wire_width = top.wire_width;
+                if (top.cam_fov_deg    >  0.f) vis_view_global.cam_fov_deg = top.cam_fov_deg;
             }
             if (jj.contains("vis_shots") && jj["vis_shots"].is_array()) {
                 vis_shots_global.clear();

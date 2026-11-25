@@ -48,6 +48,7 @@ struct VisView {
     float mesh_color[3] = {-1.f, -1.f, -1.f};  // fill colour (replaces MTL and JSON colours)
     float wire_color[3] = {-1.f, -1.f, -1.f};  // edge colour
     float wire_width    = -1.f;                // edge width in pixels (default 1)
+    float cam_fov_deg   = -1.f;                // vertical field of view of the free camera (default 45)
 };
 void vis_apply_view(VisState* vs, const VisView& v);
 
