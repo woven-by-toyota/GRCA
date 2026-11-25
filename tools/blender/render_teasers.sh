@@ -19,7 +19,7 @@ args_for() {
     VokseliaSpawn)  echo "--pixel-art --bevel 0.04 --tex-bump 0.25 --haze 0.0015 --sun auto --exposure 0.3" ;;
     RungHolt)       echo "--pixel-art --bevel 0.04 --tex-bump 0.25 --haze 0.0015 --sun auto --exposure 0.3" ;;
     Lumberyard_all) echo "--sun auto --exposure 0.6" ;;
-    SanMiguel)      echo "--sun auto --sky-strength 0.8 --exposure 1.5" ;;
+    SanMiguel)      echo "--sun camera --sky-strength 0.6 --exposure 0.8" ;;
     EmeraldSquare)  echo "--sun auto --exposure 0.2" ;;
     PowerPlant)     echo "--sun auto --exposure 0.3" ;;
   esac

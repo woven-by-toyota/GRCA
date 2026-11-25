@@ -30,8 +30,9 @@ ap.add_argument("--texdirs", nargs="*", default=[], help="folders searched by fi
 ap.add_argument("--samples", type=int, default=512)
 ap.add_argument("--res", type=int, default=100, help="resolution percentage")
 ap.add_argument("--sun", nargs="+", default=["auto"],
-                help="'auto' (most direct light on what the camera sees) or ELEVATION AZIMUTH in degrees; "
-                     "azimuth is relative to the camera heading (180 = behind the camera)")
+                help="'auto' (most direct light on what the camera sees); 'camera [D_EL D_AZ]' (sun behind the camera, "
+                     "shining along the camera-to-LiDAR line, optionally offset in degrees); or ELEVATION AZIMUTH in "
+                     "degrees, azimuth relative to the camera heading (180 = behind the camera)")
 ap.add_argument("--sun-strength", type=float, default=10.0)
 ap.add_argument("--sun-color", nargs=3, type=float, default=[1.0, 0.93, 0.84])
 ap.add_argument("--sky-strength", type=float, default=0.4)
@@ -44,6 +45,8 @@ ap.add_argument("--tex-bump", type=float, default=0.0, help="bump strength from 
 ap.add_argument("--haze", type=float, default=0.0,
                 help="scattering density (1/m) of a volume box around the scene (a world volume would absorb sun and sky)")
 ap.add_argument("--no-lidar", action="store_true", help="leave out the LiDAR cylinder")
+ap.add_argument("--lidar-white", type=float, default=64.0,
+                help="emission of the unlit LiDAR cylinder before exposure; high enough that AgX shows it white")
 ap.add_argument("--texture-limit", default="OFF", help="Cycles render texture limit, e.g. 2048")
 ap.add_argument("--save-blend")
 a = ap.parse_args(argv)
@@ -152,6 +155,7 @@ cam_obj.rotation_quaternion = f_b.to_track_quat('-Z', 'Y')
 bpy.context.view_layer.update()
 
 # --- LiDAR: the viewer's cylinder (radius = height = 0.15 m, base at the LiDAR origin, axis = the LiDAR's up) -------
+lidar_objs = []
 if not a.no_lidar and shot.get("robot_w_positions"):
     robots = json.load(open(rel(preset["benchmark_robots"][0])))
     for rp, robot in zip(shot["robot_w_positions"], robots):
@@ -167,13 +171,21 @@ if not a.no_lidar and shot.get("robot_w_positions"):
             cyl.name = "LiDAR"
             cyl.rotation_mode = 'QUATERNION'
             cyl.rotation_quaternion = axis_b.to_track_quat('Z', 'Y')
-            bpy.ops.object.shade_smooth()
+            # Unlit white, as in the viewer: emission only, seen by camera rays only (it neither lights nor
+            # shadows the scene). The AgX view transform maps 1.0 to light gray, so the emission is raised until
+            # it displays white, and divided by the exposure so every scene shows the same white.
             lm = bpy.data.materials.new("LiDAR")
             lm.use_nodes = True
-            bsdf = lm.node_tree.nodes["Principled BSDF"]
-            bsdf.inputs['Base Color'].default_value = (0.9, 0.9, 0.9, 1.0)
-            bsdf.inputs['Roughness'].default_value = 0.35
+            ln = lm.node_tree.nodes
+            ln.remove(ln["Principled BSDF"])
+            em = ln.new("ShaderNodeEmission")
+            em.inputs['Color'].default_value = (1.0, 1.0, 1.0, 1.0)
+            em.inputs['Strength'].default_value = a.lidar_white / 2.0 ** a.exposure
+            lm.node_tree.links.new(em.outputs['Emission'], ln["Material Output"].inputs['Surface'])
             cyl.data.materials.append(lm)
+            for ray in ('diffuse', 'glossy', 'transmission', 'volume_scatter', 'shadow'):
+                setattr(cyl, 'visible_' + ray, False)
+            lidar_objs.append(cyl)
             print(f"[render] LiDAR cylinder at {[round(x, 3) for x in pos]} (viewer coords), axis {[round(x, 3) for x in axis]}", flush=True)
 
 # --- sun direction -------------------------------------------------------------------------------------------
@@ -221,8 +233,56 @@ def auto_sun():
     return el, az
 
 
+def cast(o, d):
+    """scene.ray_cast that looks through the LiDAR cylinder (it casts no shadows and is not part of the scene)."""
+    dg = bpy.context.evaluated_depsgraph_get()
+    for _ in range(4):
+        hit, loc, nrm, idx, ob, _m = sc.ray_cast(dg, o, d)
+        if not (hit and ob in lidar_objs):
+            return hit, loc, nrm
+        o = loc + d * 1e-3
+    return False, None, None
+
+
+def camera_sun():
+    """Sun as close as possible to the camera's own direction to the LiDAR spot (else the centre of the view)
+    that still lights that spot: start on the line from the spot to the camera and take the nearest direction
+    (sky above the camera is often blocked) under which most of the spot gets direct sun."""
+    tgt = lidar_objs[0].matrix_world.translation if lidar_objs else cam_obj.location + f_b * 10.0
+    o = cam_obj.location
+    base = (tgt - o).normalized()
+    # the spot: camera rays within 4 degrees of the line to the LiDAR (hits on the floor or table below it)
+    t1 = base.cross(Vector((0, 0, 1))).normalized()
+    t2 = t1.cross(base).normalized()
+    pts = []
+    for i in range(-3, 4):
+        for j in range(-3, 4):
+            d = (base + t1 * math.tan(math.radians(4) * i / 3) + t2 * math.tan(math.radians(4) * j / 3)).normalized()
+            hit, loc, nrm = cast(o, d)
+            if hit:
+                pts.append((loc, -nrm if nrm.dot(d) > 0 else nrm, 1e-4 * max(1.0, (loc - o).length)))
+    d0 = -base
+    hd = Vector((d0.x, d0.y, 0.0)).normalized()
+    el0 = math.degrees(math.asin(max(-1.0, min(1.0, d0.z))))
+    az0 = math.degrees(math.atan2(heading.x * hd.y - heading.y * hd.x, heading.x * hd.x + heading.y * hd.y))
+    best = None
+    for el in range(int(max(5, el0)), 89, 3):
+        for daz in range(-60, 61, 10):
+            s = sun_dir(el, az0 + daz)
+            lit = sum(1 for loc, n, eps in pts if n.dot(s) > 0 and not cast(loc + n * eps, s)[0]) / max(1, len(pts))
+            key = (round(lit, 2), -math.degrees(s.angle(d0)))
+            if best is None or key > best[0]:
+                best = (key, el, az0 + daz)
+    off = [float(x) for x in a.sun[1:3]] + [0.0, 0.0]
+    print(f"[render] camera sun: line to camera at elevation {el0:.1f}, azimuth {az0:.1f}; nearest lighting "
+          f"{best[0][0]:.0%} of the spot ({len(pts)} points) at elevation {best[1]}, azimuth {best[2]:.0f}", flush=True)
+    return min(89.0, best[1] + off[0]), best[2] + off[1]
+
+
 if a.sun[0] == "auto":
     sun_el, sun_az = auto_sun()
+elif a.sun[0] == "camera":
+    sun_el, sun_az = camera_sun()
 else:
     sun_el, sun_az = float(a.sun[0]), float(a.sun[1])
 to_sun = sun_dir(sun_el, sun_az)
@@ -313,5 +373,10 @@ if a.save_blend:
     bpy.ops.wm.save_as_mainfile(filepath=rel(a.save_blend))
 print(f"[render] {prefs.compute_device_type if sc.cycles.device == 'GPU' else 'CPU'}, camera {list(cam_obj.location)}, "
       f"fov {fov} -> {sc.render.filepath} ({W}x{H} at {a.res}%, {a.samples} spp)", flush=True)
+from bpy_extras.object_utils import world_to_camera_view
+for o in lidar_objs:
+    c = world_to_camera_view(sc, cam_obj, o.matrix_world.translation)
+    print(f"[render] LiDAR cylinder at pixel ({c.x * W:.0f}, {(1 - c.y) * H:.0f}) of {W}x{H}, {c.z:.1f} m from the camera",
+          flush=True)
 bpy.ops.render.render(write_still=True)
 print("[render] done", flush=True)
