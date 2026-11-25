@@ -211,6 +211,27 @@ The `benchmark_config_vis_*.json` presets render figures with scripted shots (`v
 - `benchmark_config_vis_deformation_modes.json`: the ND / OBD / SWD run conditions (batches 0–2, `configs/tests/vis_deformation_modes.json`) with one sports car (`1_dyn_mesh.json`) and the 128-channel LiDAR (`max_rays_1_robot.json`) in the empty 10 × 10 × 10 world. The random dynamic test (seed 42) gives the car and the LiDAR a new random position and orientation every frame; per-triangle scale is 0.25–1.5 for legibility. The three shots auto-capture ND at frame 1270, OBD at frame 175 and SWD at frame 269, each viewed head-on; the frame number is part of every image name (`capture_<name>_f<frame>_…png`).
 - `benchmark_config_vis_deformation_preview.json`: the overview image — the 16-channel LiDAR with its cones and the sports car parked next to it on a Bistro street (clear of the curb, turned about 3° toward the camera), drawn with `configs/scenes/Lumberyard_all_vis.json` (black faces, white triangle edges via `wire_color`). Its shot `test_setup` is the paper's `TestSetup_Bistro.png`.
 
+#### Path-traced teaser renders (Blender)
+
+`tools/blender/` renders the teaser views with Blender's Cycles path tracer, from the same cameras as the `benchmark_config_vis_teaser_<Scene>.json` presets; these are the paper's teaser "render" row.
+
+```bash
+tools/blender/render_teasers.sh                            # all six scenes, 512 samples per pixel
+tools/blender/render_teasers.sh 128 SanMiguel PowerPlant   # fewer samples, some scenes
+```
+
+- Needs Blender 4.2 or newer (tested with 5.3; `blender` on the `PATH`, or `BLENDER=/path/to/blender`). Cycles uses the GPU when it finds one (OptiX, CUDA, HIP, Metal or oneAPI) and the CPU otherwise.
+- Needs the meshes with their textures: besides the OBJ/MTL files, `mesh/Amazon_Lumberyard_Bistro/{BuildingTextures,OtherTextures,PropTextures}` and `mesh/EmeraldSquare_v4_1/EmeraldSquare_v4_1/Textures` (sources and licences in `mesh/TEXTURE_SOURCES.txt`). The other scenes ship with their textures; Power Plant has none and renders in its MTL colours.
+- Output: `benchmark/teaser_renders/render_<Scene>.png` (1200 × 900) and a `.log` per scene; `OUT=<folder>` changes the folder.
+- Each render imports the scene file's OBJ files at their `scale`, places the camera from the preset's first shot (`w_cam_position`, `w_cam_forward`, `w_cam_fov`), draws the LiDAR as the viewer's white cylinder (radius and height 0.15 m) at the shot's `robot_w_positions`, and lights the scene with a physical sky and a sun. `--sun auto` picks the sun direction that puts the most direct light on what the camera sees.
+- `render_teasers.sh` holds the per-scene settings used for the paper; for a single render or other settings, call the script directly (`… --help` lists every option):
+
+  ```bash
+  blender -b --factory-startup -P tools/blender/render_teaser.py -- \
+      --preset presets/benchmark_config_vis_teaser_SanMiguel.json --out render.png --samples 256 --sun 60 150
+  ```
+- With the Blender snap, pipe its output (`… 2>&1 | cat > log`): it writes nothing when stdout is redirected to a file.
+
 Notes on what the presets run:
 - "hybrid" in `best_hybrid*` and `configs/tests/3080ti mobile/fast_hybrid_find/` refers to the periodic-rebuild (`prN`) sweep, not the hybrid backends.
 - `best_hybrid_chaos` runs OptiX only, for 10 frames (`bvh_sweep_*_chaos.json`); `best_hybrid` runs OptiX and Embree for 50 frames.
