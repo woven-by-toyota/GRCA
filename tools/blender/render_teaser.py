@@ -45,6 +45,8 @@ ap.add_argument("--tex-bump", type=float, default=0.0, help="bump strength from 
 ap.add_argument("--haze", type=float, default=0.0,
                 help="scattering density (1/m) of a volume box around the scene (a world volume would absorb sun and sky)")
 ap.add_argument("--no-lidar", action="store_true", help="leave out the LiDAR cylinder")
+ap.add_argument("--lidar-light", type=float, default=0.0,
+                help="power (W) of a point light inside the LiDAR cylinder, so it lights its surroundings")
 ap.add_argument("--lidar-white", type=float, default=64.0,
                 help="emission of the unlit LiDAR cylinder before exposure; high enough that AgX shows it white")
 ap.add_argument("--texture-limit", default="OFF", help="Cycles render texture limit, e.g. 2048")
@@ -186,6 +188,14 @@ if not a.no_lidar and shot.get("robot_w_positions"):
             for ray in ('diffuse', 'glossy', 'transmission', 'volume_scatter', 'shadow'):
                 setattr(cyl, 'visible_' + ray, False)
             lidar_objs.append(cyl)
+            if a.lidar_light > 0:
+                pl = bpy.data.lights.new("LiDARLight", 'POINT')
+                pl.energy = a.lidar_light
+                pl.shadow_soft_size = 0.15
+                pl_obj = bpy.data.objects.new("LiDARLight", pl)
+                sc.collection.objects.link(pl_obj)
+                pl_obj.location = cyl.location
+                pl_obj.visible_camera = False
             print(f"[render] LiDAR cylinder at {[round(x, 3) for x in pos]} (viewer coords), axis {[round(x, 3) for x in axis]}", flush=True)
 
 # --- sun direction -------------------------------------------------------------------------------------------

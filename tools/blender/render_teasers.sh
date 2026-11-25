@@ -13,15 +13,16 @@ SPP=${1:-512}
 [ $# -gt 0 ] && shift
 SCENES=${*:-"VokseliaSpawn Lumberyard_all SanMiguel RungHolt EmeraldSquare PowerPlant"}
 
-# Per-scene look. --sun auto picks the sun direction that puts the most direct light on what the camera sees.
+# Per-scene look. --sun auto picks the sun direction that puts the most direct light on what the camera sees;
+# --lidar-light is a point light inside the LiDAR cylinder (W), lighting what is around it.
 args_for() {
   case "$1" in
-    VokseliaSpawn)  echo "--pixel-art --bevel 0.04 --tex-bump 0.25 --haze 0.0015 --sun auto --exposure 0.3" ;;
-    RungHolt)       echo "--pixel-art --bevel 0.04 --tex-bump 0.25 --haze 0.0015 --sun auto --exposure 0.3" ;;
-    Lumberyard_all) echo "--sun auto --exposure 0.6" ;;
-    SanMiguel)      echo "--sun camera --sky-strength 0.6 --exposure 0.8" ;;
-    EmeraldSquare)  echo "--sun auto --exposure 0.2" ;;
-    PowerPlant)     echo "--sun auto --exposure 0.3" ;;
+    VokseliaSpawn)  echo "--pixel-art --bevel 0.04 --tex-bump 0.25 --haze 0.0015 --sun auto --sky-strength 0.55 --exposure 0.3 --lidar-light 50" ;;
+    RungHolt)       echo "--pixel-art --bevel 0.04 --tex-bump 0.25 --haze 0.0015 --sun auto --sky-strength 0.55 --exposure 0.3 --lidar-light 50" ;;
+    Lumberyard_all) echo "--sun auto --sky-strength 0.55 --exposure 0.6 --lidar-light 50" ;;
+    SanMiguel)      echo "--sun camera --sky-strength 0.9 --exposure 0.8 --lidar-light 50" ;;
+    EmeraldSquare)  echo "--sun auto --sky-strength 0.55 --exposure 0.2 --lidar-light 50" ;;
+    PowerPlant)     echo "--sun auto --sky-strength 0.55 --exposure 0.3 --lidar-light 50" ;;
   esac
 }
 
