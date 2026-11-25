@@ -22,7 +22,7 @@
             "robot_w_positions": [
                 [
                     -2.197,
-                    11.404,
+                    11.604,
                     78.618
                 ]
             ],
@@ -38,7 +38,18 @@
             ],
             "aabb_vis_on": false,
             "cone_vis_on": false,
-            "mesh_vis_on": 2,
+            "mesh_vis_on": 3,
+            "mesh_color": [
+                1.0,
+                1.0,
+                1.0
+            ],
+            "wire_color": [
+                0.0,
+                0.0,
+                0.0
+            ],
+            "wire_width": 1,
             "hit_vis_on": false
         },
         {
@@ -47,7 +58,7 @@
             "robot_w_positions": [
                 [
                     -2.197,
-                    11.404,
+                    11.604,
                     78.618
                 ]
             ],
@@ -72,7 +83,7 @@
             "robot_w_positions": [
                 [
                     -2.197,
-                    11.404,
+                    11.604,
                     78.618
                 ]
             ],
@@ -100,7 +111,7 @@
             "robot_w_positions": [
                 [
                     -2.197,
-                    11.404,
+                    11.604,
                     78.618
                 ]
             ],

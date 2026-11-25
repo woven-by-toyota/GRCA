@@ -1450,6 +1450,13 @@ int main(int argc, char** argv)
                 flag("dynamic_mesh_vis_on", v.dynamic_meshes);
                 if (o.contains("hit_depth_colormap"))  // heat-map hit points: "rainbow" (RViz) or "gray"
                     v.depth_colormap = (o["hit_depth_colormap"].get<std::string>() == "gray") ? 1 : 0;
+                auto rgb = [&](const char* key, float* dst) {
+                    if (o.contains(key) && o[key].is_array() && o[key].size() == 3)
+                        for (int k = 0; k < 3; ++k) dst[k] = o[key][k].get<float>();
+                };
+                rgb("mesh_color", v.mesh_color);   // every mesh, outside the heat map
+                rgb("wire_color", v.wire_color);
+                if (o.contains("wire_width")) v.wire_width = o["wire_width"].get<float>();
             };
             {
                 VisView top;
@@ -1460,6 +1467,9 @@ int main(int argc, char** argv)
                 if (top.static_meshes  >= 0) vis_view_global.static_meshes  = top.static_meshes;
                 if (top.dynamic_meshes >= 0) vis_view_global.dynamic_meshes = top.dynamic_meshes;
                 if (top.depth_colormap >= 0) vis_view_global.depth_colormap = top.depth_colormap;
+                if (top.mesh_color[0]  >= 0.f) std::copy(top.mesh_color, top.mesh_color + 3, vis_view_global.mesh_color);
+                if (top.wire_color[0]  >= 0.f) std::copy(top.wire_color, top.wire_color + 3, vis_view_global.wire_color);
+                if (top.wire_width     >  0.f) vis_view_global.wire_width = top.wire_width;
             }
             if (jj.contains("vis_shots") && jj["vis_shots"].is_array()) {
                 vis_shots_global.clear();
@@ -1752,6 +1762,23 @@ int main(int argc, char** argv)
         if (cur_run_j.contains("cone_vis_on"))
             run_cone_vis = cur_run_j["cone_vis_on"].get<bool>();
         std::vector<VisAABB> vis_aabbs;
+        // View-wide mesh colours (mesh_color / wire_color; negative = each mesh's own). Shots can change them.
+        float paint_fill[3], paint_wire[3];
+        std::copy(vis_view_global.mesh_color, vis_view_global.mesh_color + 3, paint_fill);
+        std::copy(vis_view_global.wire_color, vis_view_global.wire_color + 3, paint_wire);
+        bool paint_dirty = false;  // changed since the static meshes were last uploaded
+        // Colours of one mesh: MTL colours in mode 2, its JSON colour in mode 3 or with color_override,
+        // its wire_color for the edges, then the view-wide colours. In the heat map only the fill is set
+        // (heat colours replace it per frame) and the edges stay 30% of the fill.
+        auto paint_mesh = [&](VisMesh& vm, int mode, const float* color, bool color_override,
+                              const std::vector<float>& mtl, const float* wire) {
+            std::copy(color, color + 3, vm.color);
+            vm.tri_colors = (mode >= 3 || color_override || mtl.empty()) ? nullptr : mtl.data();
+            if (mode == MESH_VIS_HEAT) return;
+            std::copy(wire, wire + 3, vm.wire_color);
+            if (paint_fill[0] >= 0.f) { std::copy(paint_fill, paint_fill + 3, vm.color); vm.tri_colors = nullptr; }
+            if (paint_wire[0] >= 0.f) std::copy(paint_wire, paint_wire + 3, vm.wire_color);
+        };
         if (run_vis_on) {
             scene_cfg.visualizer_on = true;
             scene_cfg.mesh_vis_on   = run_mesh_vis;
@@ -1777,9 +1804,7 @@ int main(int argc, char** argv)
                 VisMesh vm;
                 vm.tris       = static_vis_tris[i].data();
                 vm.count      = static_vis_tris[i].size();
-                vm.color[0]   = sm.color[0]; vm.color[1] = sm.color[1]; vm.color[2] = sm.color[2];
-                vm.tri_colors = (run_mesh_vis >= 3 || sm.color_override || static_vis_colors[i].empty()) ? nullptr : static_vis_colors[i].data();
-                if (run_mesh_vis != MESH_VIS_HEAT) std::copy(sm.wire_color, sm.wire_color + 3, vm.wire_color);
+                paint_mesh(vm, run_mesh_vis, sm.color, sm.color_override, static_vis_colors[i], sm.wire_color);
                 svm.push_back(vm);
             }
             vis_set_static_meshes(vis, svm);
@@ -1790,9 +1815,7 @@ int main(int argc, char** argv)
                 VisMesh vm;
                 vm.tris       = init_tris.data() + doff;
                 vm.count      = dyn_mesh_tris[i].size();
-                vm.color[0]   = dm.color[0]; vm.color[1] = dm.color[1]; vm.color[2] = dm.color[2];
-                vm.tri_colors = (run_mesh_vis >= 3 || dm.color_override || dyn_mesh_colors[i].empty()) ? nullptr : dyn_mesh_colors[i].data();
-                if (run_mesh_vis != MESH_VIS_HEAT) std::copy(dm.wire_color, dm.wire_color + 3, vm.wire_color);
+                paint_mesh(vm, run_mesh_vis, dm.color, dm.color_override, dyn_mesh_colors[i], dm.wire_color);
                 dvm.push_back(vm);
                 doff += dyn_mesh_tris[i].size();
             }
@@ -2469,6 +2492,11 @@ int main(int argc, char** argv)
                         if (sh.frame == frame && (sh.batch < 0 || sh.batch == (int)batchIdx)) { cur_shot = &sh; break; }
                     if (cur_shot) {
                         vis_apply_view(vis, cur_shot->view);
+                        auto take = [&](float* dst, const float* src) {  // a shot's mesh_color / wire_color
+                            if (src[0] >= 0.f && !std::equal(src, src + 3, dst)) { std::copy(src, src + 3, dst); paint_dirty = true; }
+                        };
+                        take(paint_fill, cur_shot->view.mesh_color);
+                        take(paint_wire, cur_shot->view.wire_color);
                         for (size_t ri = 0; ri < cur_shot->robot_pos.size() && ri < cfg.robots.size(); ++ri)
                             cfg.robots[ri].w_pose.pos = cur_shot->robot_pos[ri];  // lidar poses follow below
                         if (cur_shot->has_pos)
@@ -3064,8 +3092,9 @@ int main(int argc, char** argv)
                         pending_capture_name.clear();
                     }
                     // Colouring changed at runtime (V key or a shot): heat recolours from this
-                    // frame's counts; other modes restore the static meshes' normal colours.
-                    if (cfg.mesh_vis_on != applied_mesh_mode) {
+                    // frame's counts; other modes restore the static meshes' normal colours
+                    // (or the view-wide ones a shot set).
+                    if (cfg.mesh_vis_on != applied_mesh_mode || (paint_dirty && cfg.mesh_vis_on != MESH_VIS_HEAT)) {
                         if (cfg.mesh_vis_on == MESH_VIS_HEAT) {
                             heat_prev.clear();
                         } else {
@@ -3075,13 +3104,11 @@ int main(int argc, char** argv)
                                 VisMesh vm;
                                 vm.tris       = static_vis_tris[i].data();
                                 vm.count      = static_vis_tris[i].size();
-                                vm.color[0]   = sm.color[0]; vm.color[1] = sm.color[1]; vm.color[2] = sm.color[2];
-                                vm.tri_colors = (cfg.mesh_vis_on >= 3 || sm.color_override || static_vis_colors[i].empty())
-                                              ? nullptr : static_vis_colors[i].data();
-                                std::copy(sm.wire_color, sm.wire_color + 3, vm.wire_color);
+                                paint_mesh(vm, cfg.mesh_vis_on, sm.color, sm.color_override, static_vis_colors[i], sm.wire_color);
                                 svm.push_back(vm);
                             }
                             vis_set_static_meshes(vis, svm);
+                            paint_dirty = false;
                             if (cfg.dynamic_meshes.empty()) vis_update_dynamic_meshes(vis, {});
                         }
                         applied_mesh_mode = cfg.mesh_vis_on;
@@ -3146,11 +3173,10 @@ int main(int argc, char** argv)
                             VisMesh vm;
                             vm.tris       = tris.data() + doff;
                             vm.count      = dyn_mesh_tris[i].size();
-                            vm.color[0]   = dm.color[0]; vm.color[1] = dm.color[1]; vm.color[2] = dm.color[2];
-                            vm.tri_colors = heat_work ? heat_colors.data() + doff * 3
-                                          : (cfg.mesh_vis_on >= 3 || dm.color_override || dyn_mesh_colors[i].empty()) ? nullptr
-                                          : dyn_mesh_colors[i].data();
-                            if (!heat_work) std::copy(dm.wire_color, dm.wire_color + 3, vm.wire_color);
+                            // Heat map without counts (other backends) keeps the mode-3 colours.
+                            paint_mesh(vm, heat_work ? MESH_VIS_HEAT : std::min(cfg.mesh_vis_on, 3),
+                                       dm.color, dm.color_override, dyn_mesh_colors[i], dm.wire_color);
+                            if (heat_work) vm.tri_colors = heat_colors.data() + doff * 3;
                             dvm.push_back(vm);
                             doff += dyn_mesh_tris[i].size();
                         }

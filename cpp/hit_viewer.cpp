@@ -30,6 +30,7 @@ struct VisState : OrbitCamera {
 	bool hitsVisible      = true;   // H toggles
 	bool aabbsVisible     = true;   // X toggles; off by default in heat-map mode
 	int  depthColormap    = 0;      // heat-map hit points: 0 = rainbow (near red -> far blue), 1 = grayscale (G toggles)
+	float meshWireWidth   = 1.0f;   // mesh edge width outside the heat map (wire_width)
 	bool scripted         = false;  // vis_shots / auto_capture run: ignore keyboard/mouse (Esc still quits)
 	bool  depthShown      = false;  // last frame drew depth-coloured points
 	float depthNear = 0.f, depthFar = 0.f;  // their colour range (LiDAR range or camera depth)
@@ -664,7 +665,7 @@ void vis_update(VisState* vs, const std::vector<GrcaHit>& hits, const RunConfig&
 	// mesh_vis_on>=1: wireframe
 	if (vs->visMode >= 1 && g_vk.meshWireBuffer != VK_NULL_HANDLE) {
 		vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, g_vk.meshWirePipeline);
-		vkCmdSetLineWidth(cmd, 1.0f);
+		vkCmdSetLineWidth(cmd, selectedMeshMode(vs) == MESH_VIS_HEAT ? 1.0f : vs->meshWireWidth);
 		VkDeviceSize offset = 0;
 		vkCmdBindVertexBuffers(cmd, 0, 1, &g_vk.meshWireBuffer, &offset);
 		vkCmdPushConstants(cmd, g_vk.pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushData), pushData);
@@ -834,6 +835,7 @@ void vis_apply_view(VisState* vs, const VisView& v) {
 	if (v.aabbs >= 0) vs->aabbsVisible = (v.aabbs != 0);
 	if (v.cones >= 0) vs->conesVisible = (v.cones != 0);
 	if (v.depth_colormap >= 0) vs->depthColormap = v.depth_colormap;
+	if (v.wire_width > 0.f) vs->meshWireWidth = v.wire_width;
 }
 
 bool vis_take_image(VisState* vs, std::vector<unsigned char>& rgb, int& w, int& h) {

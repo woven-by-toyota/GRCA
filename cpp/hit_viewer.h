@@ -43,6 +43,11 @@ struct VisView {
     int static_meshes  = -1;  // 0/1: static meshes
     int dynamic_meshes = -1;  // 0/1: dynamic meshes
     int depth_colormap = -1;  // heat-map hit points: 0 = rainbow (near red -> far blue), 1 = grayscale
+    // Outside the heat map (mesh_vis_on 1..3), for every mesh; negative = keep. The viewer applies
+    // wire_width; the caller bakes mesh_color / wire_color into the VisMesh data it uploads.
+    float mesh_color[3] = {-1.f, -1.f, -1.f};  // fill colour (replaces MTL and JSON colours)
+    float wire_color[3] = {-1.f, -1.f, -1.f};  // edge colour
+    float wire_width    = -1.f;                // edge width in pixels (default 1)
 };
 void vis_apply_view(VisState* vs, const VisView& v);
 
