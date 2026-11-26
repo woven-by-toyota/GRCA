@@ -1,7 +1,7 @@
 {
     "static_meshes": [
         {
-            "file": "mesh/powerplant/powerplant.obj",
+            "file": "mesh/powerplant/powerPlant.obj",
             "scale": 0.001,
             "w_position": [
                 0.0,
